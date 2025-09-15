@@ -1,0 +1,1 @@
+# easyshop-auth-service
