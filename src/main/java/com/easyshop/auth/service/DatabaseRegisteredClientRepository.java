@@ -12,80 +12,91 @@ import org.springframework.security.oauth2.server.authorization.settings.ClientS
 import org.springframework.security.oauth2.server.authorization.settings.TokenSettings;
 import org.springframework.stereotype.Service;
 
-import java.time.Duration;
+import java.util.Optional;
 import java.util.Set;
-import java.util.UUID;
 
 @Service
 public class DatabaseRegisteredClientRepository implements RegisteredClientRepository {
-    
+
+    private static final TypeReference<Set<String>> STRING_SET_TYPE = new TypeReference<>() {};
+
     private final OAuth2ClientRepository clientRepository;
     private final ObjectMapper objectMapper;
-    
+
     public DatabaseRegisteredClientRepository(OAuth2ClientRepository clientRepository, ObjectMapper objectMapper) {
         this.clientRepository = clientRepository;
         this.objectMapper = objectMapper;
     }
-    
+
     @Override
     public void save(RegisteredClient registeredClient) {
-        // Not implemented - clients are managed through OAuth2ClientInitializer
         throw new UnsupportedOperationException("Use OAuth2ClientInitializer to manage clients");
     }
-    
+
     @Override
     public RegisteredClient findById(String id) {
-        return clientRepository.findById(Long.valueOf(id))
+        if (id == null) {
+            return null;
+        }
+        return parseLong(id)
+                .flatMap(clientRepository::findById)
                 .map(this::convertToRegisteredClient)
                 .orElse(null);
     }
-    
+
     @Override
     public RegisteredClient findByClientId(String clientId) {
         return clientRepository.findByClientId(clientId)
                 .map(this::convertToRegisteredClient)
                 .orElse(null);
     }
-    
+
     private RegisteredClient convertToRegisteredClient(OAuth2Client client) {
         try {
-            RegisteredClient.Builder builder = RegisteredClient.withId(UUID.randomUUID().toString())
-                    .clientId(client.getClientId())
-                    .clientSecret(client.getClientSecret());
-            
-            // Parse client authentication methods
-            Set<String> authMethods = objectMapper.readValue(client.getClientAuthenticationMethods(), new TypeReference<Set<String>>() {});
-            authMethods.forEach(method -> builder.clientAuthenticationMethod(new ClientAuthenticationMethod(method)));
-            
-            // Parse authorization grant types
-            Set<String> grantTypes = objectMapper.readValue(client.getAuthorizationGrantTypes(), new TypeReference<Set<String>>() {});
-            grantTypes.forEach(grantType -> builder.authorizationGrantType(new AuthorizationGrantType(grantType)));
-            
-            // Parse redirect URIs
+            RegisteredClient.Builder builder = RegisteredClient.withId(String.valueOf(client.getId()))
+                    .clientId(client.getClientId());
+
+            if (client.getClientSecret() != null) {
+                builder.clientSecret(client.getClientSecret());
+            }
+
+            // Client authentication methods
+            readStringSet(client.getClientAuthenticationMethods())
+                    .forEach(method -> builder.clientAuthenticationMethod(new ClientAuthenticationMethod(method)));
+
+            // Authorization grant types
+            readStringSet(client.getAuthorizationGrantTypes())
+                    .forEach(grant -> builder.authorizationGrantType(new AuthorizationGrantType(grant)));
+
             if (client.getRedirectUris() != null && !client.getRedirectUris().isEmpty()) {
-                Set<String> redirectUris = objectMapper.readValue(client.getRedirectUris(), new TypeReference<Set<String>>() {});
-                redirectUris.forEach(builder::redirectUri);
+                readStringSet(client.getRedirectUris()).forEach(builder::redirectUri);
             }
-            
-            // Parse scopes
-            Set<String> scopes = objectMapper.readValue(client.getScopes(), new TypeReference<Set<String>>() {});
-            scopes.forEach(builder::scope);
-            
-            // Parse client settings
+
+            readStringSet(client.getScopes()).forEach(builder::scope);
+
             if (client.getClientSettings() != null && !client.getClientSettings().isEmpty()) {
-                ClientSettings clientSettings = objectMapper.readValue(client.getClientSettings(), ClientSettings.class);
-                builder.clientSettings(clientSettings);
+                builder.clientSettings(objectMapper.readValue(client.getClientSettings(), ClientSettings.class));
             }
-            
-            // Parse token settings
+
             if (client.getTokenSettings() != null && !client.getTokenSettings().isEmpty()) {
-                TokenSettings tokenSettings = objectMapper.readValue(client.getTokenSettings(), TokenSettings.class);
-                builder.tokenSettings(tokenSettings);
+                builder.tokenSettings(objectMapper.readValue(client.getTokenSettings(), TokenSettings.class));
             }
-            
+
             return builder.build();
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to convert OAuth2Client to RegisteredClient", e);
+        } catch (Exception ex) {
+            throw new RuntimeException("Failed to convert OAuth2Client to RegisteredClient", ex);
+        }
+    }
+
+    private Set<String> readStringSet(String json) throws Exception {
+        return objectMapper.readValue(json, STRING_SET_TYPE);
+    }
+
+    private Optional<Long> parseLong(String id) {
+        try {
+            return Optional.of(Long.parseLong(id));
+        } catch (NumberFormatException ex) {
+            return Optional.empty();
         }
     }
 }
