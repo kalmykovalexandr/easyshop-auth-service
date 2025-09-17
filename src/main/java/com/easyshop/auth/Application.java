@@ -1,12 +1,13 @@
 package com.easyshop.auth;
 
-import org.springframework.boot.*;
-import org.springframework.boot.autoconfigure.*;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 
 @SpringBootApplication
+@EnableJpaAuditing
 public class Application {
-    public static void main(String[] a) {
-        SpringApplication.run(Application.class, a);
+    public static void main(String[] args) {
+        SpringApplication.run(Application.class, args);
     }
 }
-

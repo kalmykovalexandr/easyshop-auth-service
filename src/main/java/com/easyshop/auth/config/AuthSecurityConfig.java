@@ -1,6 +1,5 @@
 package com.easyshop.auth.config;
 
-import com.easyshop.auth.service.DatabaseRegisteredClientRepository;
 import com.easyshop.auth.service.DatabaseUserDetailsService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -13,7 +12,6 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.config.annotation.web.configurers.OAuth2AuthorizationServerConfigurer;
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
 import org.springframework.security.web.SecurityFilterChain;
@@ -103,14 +101,10 @@ public class AuthSecurityConfig {
     }
 
     @Bean
-    public RegisteredClientRepository registeredClientRepository(DatabaseRegisteredClientRepository databaseRepository) {
-        return databaseRepository;
-    }
-
-    @Bean
     public AuthorizationServerSettings authorizationServerSettings() {
         return AuthorizationServerSettings.builder()
                 .issuer(issuerUri)
                 .build();
     }
 }
+
