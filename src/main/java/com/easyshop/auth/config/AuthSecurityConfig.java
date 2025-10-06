@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.MediaType;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -24,13 +25,19 @@ import org.springframework.security.oauth2.server.authorization.settings.Authori
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
 import org.springframework.security.web.util.matcher.MediaTypeRequestMatcher;
-import org.springframework.http.MediaType;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
+import java.time.Duration;
+import java.util.Arrays;
+import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * Spring Authorization Server configuration with OIDC Discovery support.
@@ -41,9 +48,21 @@ import java.util.UUID;
 public class AuthSecurityConfig {
 
     private final String issuerUri;
+    private final List<String> allowedOrigins;
 
-    public AuthSecurityConfig(@Value("${easyshop.auth.issuer-uri}") String issuerUri) {
+    public AuthSecurityConfig(
+            @Value("${easyshop.auth.issuer-uri}") String issuerUri,
+            @Value("${easyshop.auth.allowed-origins:http://localhost:5173}") String allowedOrigins
+    ) {
         this.issuerUri = issuerUri;
+        this.allowedOrigins = parseOrigins(allowedOrigins);
+    }
+
+    private static List<String> parseOrigins(String origins) {
+        return Arrays.stream(origins.split(","))
+                .map(String::trim)
+                .filter(origin -> !origin.isBlank())
+                .collect(Collectors.toList());
     }
 
     /**
@@ -59,6 +78,7 @@ public class AuthSecurityConfig {
 
         http
                 .securityMatcher(authorizationServerConfigurer.getEndpointsMatcher())
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .with(authorizationServerConfigurer, (authorizationServer) ->
                         authorizationServer
                                 .oidc(Customizer.withDefaults())
@@ -85,15 +105,31 @@ public class AuthSecurityConfig {
             throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .authorizeHttpRequests((authorize) -> authorize
                         .requestMatchers("/login", "/error", "/webjars/**",
-                                "/healthz", "/readyz", "/api/auth/**").permitAll()
+                                "/healthz", "/readyz", "/api/auth/**", "/.well-known/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .formLogin(Customizer.withDefaults())
                 .authenticationProvider(authProvider);
 
         return http.build();
+    }
+
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        configuration.setAllowedOrigins(allowedOrigins);
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
+        configuration.setAllowedHeaders(List.of("*"));
+        configuration.setAllowCredentials(true);
+        configuration.setMaxAge(Duration.ofHours(1));
+        configuration.setExposedHeaders(List.of("Location"));
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
     }
 
     @Bean

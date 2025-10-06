@@ -81,7 +81,9 @@ public class DatabaseRegisteredClientRepository implements RegisteredClientRepos
                     .forEach(grant -> builder.authorizationGrantType(new AuthorizationGrantType(grant)));
 
             if (client.getRedirectUris() != null && !client.getRedirectUris().isEmpty()) {
-                readStringSet(client.getRedirectUris()).forEach(builder::redirectUri);
+                Set<String> redirectUris = readStringSet(client.getRedirectUris());
+                redirectUris.forEach(builder::redirectUri);
+                redirectUris.forEach(builder::postLogoutRedirectUri);
             }
 
             readStringSet(client.getScopes()).forEach(builder::scope);

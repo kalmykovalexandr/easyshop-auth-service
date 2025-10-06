@@ -3,6 +3,7 @@ package com.easyshop.auth.service;
 import com.easyshop.auth.entity.OAuth2Client;
 import com.easyshop.auth.repository.OAuth2ClientRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
@@ -18,21 +19,24 @@ import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashSet;
-import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
 public class OAuth2ClientInitializer implements CommandLineRunner {
 
+    private static final TypeReference<LinkedHashSet<String>> STRING_SET_TYPE = new TypeReference<>() {
+    };
+
     private final OAuth2ClientRepository clientRepository;
     private final PasswordEncoder passwordEncoder;
     private final ObjectMapper objectMapper;
 
-    @Value("${WEBAPP_REDIRECT_URI:http://localhost:3000/callback}")
+    @Value("${WEBAPP_REDIRECT_URI:http://localhost:5173/auth/callback}")
     private String webappRedirectUri;
 
-    @Value("${WEBAPP_POST_LOGOUT_REDIRECT_URI:http://localhost:3000}")
+    @Value("${WEBAPP_POST_LOGOUT_REDIRECT_URI:http://localhost:5173}")
     private String webappPostLogoutRedirectUri;
 
     @Value("${GATEWAY_CLIENT_SECRET:gateway-secret}")
@@ -58,84 +62,127 @@ public class OAuth2ClientInitializer implements CommandLineRunner {
     }
 
     private void initializeDefaultClients() {
-        if (!clientRepository.existsByClientId("webapp")) {
-            OAuth2Client webappClient = OAuth2Client.builder()
-                    .clientId("webapp")
-                    .clientSecret(null)
-                    .clientAuthenticationMethods(toJson(Set.of(ClientAuthenticationMethod.NONE.getValue())))
-                    .authorizationGrantTypes(toJson(Set.of(
-                            AuthorizationGrantType.AUTHORIZATION_CODE.getValue(),
-                            AuthorizationGrantType.REFRESH_TOKEN.getValue()
-                    )))
-                    .redirectUris(toJson(uniqueNonBlank(webappRedirectUri, webappPostLogoutRedirectUri)))
-                    .scopes(toJson(Set.of("openid", "profile", "read", "write")))
-                    .clientSettings(toJson(ClientSettings.builder()
-                            .requireAuthorizationConsent(false)
-                            .requireProofKey(true)
-                            .build().getSettings()))
-                    .tokenSettings(toJson(TokenSettings.builder()
-                            .accessTokenTimeToLive(Duration.ofHours(1))
-                            .refreshTokenTimeToLive(Duration.ofDays(7))
-                            .idTokenSignatureAlgorithm(SignatureAlgorithm.RS256)
-                            .reuseRefreshTokens(true)
-                            .build().getSettings()))
-                    .build();
-            clientRepository.save(webappClient);
+        ensureWebappClient();
+        ensureGatewayClient();
+        ensureProductServiceClient();
+        ensurePurchaseServiceClient();
+    }
+
+    private void ensureWebappClient() {
+        Set<String> redirectUris = uniqueNonBlank(webappRedirectUri, webappPostLogoutRedirectUri);
+        String redirectUrisJson = toJson(redirectUris);
+
+        Optional<OAuth2Client> existingClient = clientRepository.findByClientId("webapp");
+
+        if (existingClient.isPresent()) {
+            OAuth2Client client = existingClient.get();
+            if (!stringCollectionEquals(client.getRedirectUris(), redirectUris)) {
+                client.setRedirectUris(redirectUrisJson);
+                clientRepository.save(client);
+            }
+            return;
         }
 
-        if (!clientRepository.existsByClientId("gateway")) {
-            OAuth2Client gatewayClient = OAuth2Client.builder()
-                    .clientId("gateway")
-                    .clientSecret(passwordEncoder.encode(gatewayClientSecret))
-                    .clientAuthenticationMethods(toJson(Set.of(ClientAuthenticationMethod.CLIENT_SECRET_BASIC.getValue())))
-                    .authorizationGrantTypes(toJson(Set.of(AuthorizationGrantType.CLIENT_CREDENTIALS.getValue())))
-                    .redirectUris(toJson(Collections.emptySet()))
-                    .scopes(toJson(Set.of("read", "write")))
-                    .clientSettings(toJson(ClientSettings.builder().build().getSettings()))
-                    .tokenSettings(toJson(TokenSettings.builder()
-                            .accessTokenTimeToLive(Duration.ofHours(1))
-                            .build().getSettings()))
-                    .build();
-            clientRepository.save(gatewayClient);
-        }
+        OAuth2Client webappClient = OAuth2Client.builder()
+                .clientId("webapp")
+                .clientSecret(null)
+                .clientAuthenticationMethods(toJson(Set.of(ClientAuthenticationMethod.NONE.getValue())))
+                .authorizationGrantTypes(toJson(Set.of(
+                        AuthorizationGrantType.AUTHORIZATION_CODE.getValue(),
+                        AuthorizationGrantType.REFRESH_TOKEN.getValue()
+                )))
+                .redirectUris(redirectUrisJson)
+                .scopes(toJson(Set.of("openid", "profile", "read", "write")))
+                .clientSettings(toJson(ClientSettings.builder()
+                        .requireAuthorizationConsent(false)
+                        .requireProofKey(true)
+                        .build().getSettings()))
+                .tokenSettings(toJson(TokenSettings.builder()
+                        .accessTokenTimeToLive(Duration.ofHours(1))
+                        .refreshTokenTimeToLive(Duration.ofDays(7))
+                        .idTokenSignatureAlgorithm(SignatureAlgorithm.RS256)
+                        .reuseRefreshTokens(true)
+                        .build().getSettings()))
+                .build();
+        clientRepository.save(webappClient);
+    }
 
-        if (!clientRepository.existsByClientId("product-service")) {
-            OAuth2Client productServiceClient = OAuth2Client.builder()
-                    .clientId("product-service")
-                    .clientSecret(passwordEncoder.encode(productServiceClientSecret))
-                    .clientAuthenticationMethods(toJson(Set.of(ClientAuthenticationMethod.CLIENT_SECRET_BASIC.getValue())))
-                    .authorizationGrantTypes(toJson(Set.of(AuthorizationGrantType.CLIENT_CREDENTIALS.getValue())))
-                    .redirectUris(toJson(Collections.emptySet()))
-                    .scopes(toJson(Set.of("read", "write")))
-                    .clientSettings(toJson(ClientSettings.builder().build().getSettings()))
-                    .tokenSettings(toJson(TokenSettings.builder()
-                            .accessTokenTimeToLive(Duration.ofHours(1))
-                            .build().getSettings()))
-                    .build();
-            clientRepository.save(productServiceClient);
+    private void ensureGatewayClient() {
+        if (clientRepository.existsByClientId("gateway")) {
+            return;
         }
+        OAuth2Client gatewayClient = OAuth2Client.builder()
+                .clientId("gateway")
+                .clientSecret(passwordEncoder.encode(gatewayClientSecret))
+                .clientAuthenticationMethods(toJson(Set.of(ClientAuthenticationMethod.CLIENT_SECRET_BASIC.getValue())))
+                .authorizationGrantTypes(toJson(Set.of(AuthorizationGrantType.CLIENT_CREDENTIALS.getValue())))
+                .redirectUris(toJson(Collections.emptySet()))
+                .scopes(toJson(Set.of("read", "write")))
+                .clientSettings(toJson(ClientSettings.builder().build().getSettings()))
+                .tokenSettings(toJson(TokenSettings.builder()
+                        .accessTokenTimeToLive(Duration.ofHours(1))
+                        .build().getSettings()))
+                .build();
+        clientRepository.save(gatewayClient);
+    }
 
-        if (!clientRepository.existsByClientId("purchase-service")) {
-            OAuth2Client purchaseServiceClient = OAuth2Client.builder()
-                    .clientId("purchase-service")
-                    .clientSecret(passwordEncoder.encode(purchaseServiceClientSecret))
-                    .clientAuthenticationMethods(toJson(Set.of(ClientAuthenticationMethod.CLIENT_SECRET_BASIC.getValue())))
-                    .authorizationGrantTypes(toJson(Set.of(AuthorizationGrantType.CLIENT_CREDENTIALS.getValue())))
-                    .redirectUris(toJson(Collections.emptySet()))
-                    .scopes(toJson(Set.of("read", "write")))
-                    .clientSettings(toJson(ClientSettings.builder().build().getSettings()))
-                    .tokenSettings(toJson(TokenSettings.builder()
-                            .accessTokenTimeToLive(Duration.ofHours(1))
-                            .build().getSettings()))
-                    .build();
-            clientRepository.save(purchaseServiceClient);
+    private void ensureProductServiceClient() {
+        if (clientRepository.existsByClientId("product-service")) {
+            return;
         }
+        OAuth2Client productServiceClient = OAuth2Client.builder()
+                .clientId("product-service")
+                .clientSecret(passwordEncoder.encode(productServiceClientSecret))
+                .clientAuthenticationMethods(toJson(Set.of(ClientAuthenticationMethod.CLIENT_SECRET_BASIC.getValue())))
+                .authorizationGrantTypes(toJson(Set.of(AuthorizationGrantType.CLIENT_CREDENTIALS.getValue())))
+                .redirectUris(toJson(Collections.emptySet()))
+                .scopes(toJson(Set.of("read", "write")))
+                .clientSettings(toJson(ClientSettings.builder().build().getSettings()))
+                .tokenSettings(toJson(TokenSettings.builder()
+                        .accessTokenTimeToLive(Duration.ofHours(1))
+                        .build().getSettings()))
+                .build();
+        clientRepository.save(productServiceClient);
+    }
+
+    private void ensurePurchaseServiceClient() {
+        if (clientRepository.existsByClientId("purchase-service")) {
+            return;
+        }
+        OAuth2Client purchaseServiceClient = OAuth2Client.builder()
+                .clientId("purchase-service")
+                .clientSecret(passwordEncoder.encode(purchaseServiceClientSecret))
+                .clientAuthenticationMethods(toJson(Set.of(ClientAuthenticationMethod.CLIENT_SECRET_BASIC.getValue())))
+                .authorizationGrantTypes(toJson(Set.of(AuthorizationGrantType.CLIENT_CREDENTIALS.getValue())))
+                .redirectUris(toJson(Collections.emptySet()))
+                .scopes(toJson(Set.of("read", "write")))
+                .clientSettings(toJson(ClientSettings.builder().build().getSettings()))
+                .tokenSettings(toJson(TokenSettings.builder()
+                        .accessTokenTimeToLive(Duration.ofHours(1))
+                        .build().getSettings()))
+                .build();
+        clientRepository.save(purchaseServiceClient);
     }
 
     private Set<String> uniqueNonBlank(String... values) {
         return Arrays.stream(values)
                 .filter(value -> value != null && !value.isBlank())
                 .collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    private boolean stringCollectionEquals(String json, Set<String> expected) {
+        return readStringSet(json).equals(expected);
+    }
+
+    private Set<String> readStringSet(String json) {
+        if (json == null || json.isBlank()) {
+            return Collections.emptySet();
+        }
+        try {
+            return objectMapper.readValue(json, STRING_SET_TYPE);
+        } catch (JsonProcessingException ex) {
+            throw new IllegalStateException("Failed to parse OAuth2 client configuration", ex);
+        }
     }
 
     private String toJson(Object value) {
