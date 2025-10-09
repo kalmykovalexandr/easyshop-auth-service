@@ -24,7 +24,7 @@
 
             <form method="post" action="/login" class="auth-form" novalidate>
                 <label class="auth-field">
-                    <span class="auth-field__label" th:text="#{login.form.email}">Email Address</span>
+                    <span class="auth-field__label" th:text="#{login.form.email}">E-mail</span>
                     <input class="auth-field__input" type="email" name="username" autocomplete="username" required>
                 </label>
                 <label class="auth-field auth-field--with-toggle">
@@ -44,7 +44,7 @@
                 <div th:if="${loginError}" class="auth-feedback auth-feedback--error" th:text="#{login.form.error}">Invalid email or password. Try again.</div>
             </form>
 
-            <div class="auth-divider" th:text="#{login.separator}">or continue with</div>
+            <div class="auth-divider" th:text="#{login.separator}">or</div>
 
             <div class="auth-providers">
                 <button type="button" class="provider" aria-label="Google">
@@ -80,7 +80,7 @@
                            data-error-email=#{login.register.error.email},
                            data-error-password=#{login.register.error.password}">
                 <label class="auth-field">
-                    <span class="auth-field__label" th:text="#{login.form.email}">Email Address</span>
+                    <span class="auth-field__label" th:text="#{login.form.email}">E-mail</span>
                     <input class="auth-field__input" type="email" name="email" autocomplete="email" required>
                 </label>
                 <label class="auth-field auth-field--with-toggle">
@@ -114,7 +114,7 @@
                 <div class="auth-feedback" data-feedback></div>
             </form>
 
-            <p class="auth-note" th:text="#{login.register.footer}">By submitting the form you agree to the EasyShop privacy policy.</p>
+            <p class="auth-note" th:text="#{login.register.footer}">By submitting the form you agree to the privacy policy.</p>
         </section>
     </div>
 </div>
