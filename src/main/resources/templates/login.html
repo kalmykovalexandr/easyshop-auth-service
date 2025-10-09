@@ -22,7 +22,9 @@
                 </p>
             </header>
 
-            <form method="post" action="/login" class="auth-form" novalidate>
+            <form method="post" action="/login" class="auth-form" novalidate
+                th:attr="data-error-missing-email=#{login.form.error.missingEmail},
+                         data-error-missing-password=#{login.form.error.missingPassword}">
                 <label class="auth-field">
                     <span class="auth-field__label" th:text="#{login.form.email}">E-mail</span>
                     <input class="auth-field__input" type="email" name="username" autocomplete="username" required>
@@ -41,7 +43,10 @@
                     </div>
                 </label>
                 <button type="submit" class="auth-button" th:text="#{login.form.submit}">Sign in</button>
-                <div th:if="${loginError}" class="auth-feedback auth-feedback--error" th:text="#{login.form.error}">Invalid email or password. Try again.</div>
+                <div class="auth-feedback auth-feedback--error"
+                 data-signin-feedback
+                 th:attr="hidden=${loginError} ? null : true"
+                 th:text="${loginError} ? #{login.form.error} : ''">Invalid email or password. Try again.</div>
             </form>
 
             <div class="auth-divider" th:text="#{login.separator}">or</div>

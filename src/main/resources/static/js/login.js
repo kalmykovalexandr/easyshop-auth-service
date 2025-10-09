@@ -96,6 +96,84 @@
   setMode(initialMode);
   setupPasswordToggles();
 
+  const signinForm = loginSection?.querySelector('form.auth-form')
+  const signinEmailField = signinForm?.querySelector('input[name="username"]')
+  const signinPasswordField = signinForm?.querySelector('input[name="password"]')
+  const signinFeedback = signinForm?.querySelector('[data-signin-feedback]')
+  const signinMessages = {
+    missingEmail: signinForm?.dataset?.errorMissingEmail || 'Enter your e-mail.',
+    missingPassword: signinForm?.dataset?.errorMissingPassword || 'Enter your password.'
+  }
+
+  if (signinFeedback) {
+    const hasServerMessage = !signinFeedback.hasAttribute('hidden') && signinFeedback.textContent.trim().length > 0
+    signinFeedback.dataset.state = hasServerMessage ? 'server' : 'idle'
+  }
+
+  function markSigninInvalid(input, isInvalid) {
+    if (!input) {
+      return
+    }
+    const field = input.closest('.auth-field')
+    if (field) {
+      field.classList.toggle('auth-field--invalid', Boolean(isInvalid))
+    }
+  }
+
+  function showSigninFeedback(message) {
+    if (!signinFeedback) {
+      return
+    }
+    signinFeedback.textContent = message
+    signinFeedback.classList.add('auth-feedback--error')
+    signinFeedback.removeAttribute('hidden')
+    signinFeedback.dataset.state = 'client'
+    syncCardHeight()
+  }
+
+  function clearSigninFeedback() {
+    if (!signinFeedback || signinFeedback.dataset.state === 'server') {
+      return
+    }
+    if (signinFeedback.textContent) {
+      signinFeedback.textContent = ''
+    }
+    if (!signinFeedback.hasAttribute('hidden')) {
+      signinFeedback.setAttribute('hidden', '')
+      syncCardHeight()
+    }
+    signinFeedback.dataset.state = 'idle'
+  }
+
+  ;[signinEmailField, signinPasswordField].forEach((input) => {
+    input?.addEventListener('input', () => {
+      markSigninInvalid(input, false)
+      clearSigninFeedback()
+    })
+  })
+
+  if (signinForm) {
+    signinForm.addEventListener('submit', (event) => {
+      const emailValue = signinEmailField ? signinEmailField.value.trim() : ''
+      const passwordValue = signinPasswordField ? signinPasswordField.value : ''
+      const missingEmail = !emailValue
+      const missingPassword = !passwordValue
+
+      if (missingEmail || missingPassword) {
+        event.preventDefault()
+        markSigninInvalid(signinEmailField, missingEmail)
+        markSigninInvalid(signinPasswordField, missingPassword)
+        const message = missingEmail ? signinMessages.missingEmail : signinMessages.missingPassword
+        showSigninFeedback(message)
+        const focusTarget = missingEmail ? signinEmailField : signinPasswordField
+        focusTarget?.focus()
+        return
+      }
+
+      clearSigninFeedback()
+    })
+  }
+
   function setupPasswordToggles() {
     passwordToggleButtons.forEach((button) => {
       const field = button.closest('.auth-field')
