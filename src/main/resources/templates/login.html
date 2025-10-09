@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org" th:attr="lang=${#locale.language}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="#{login.meta.title.signin}">EasyShop - Sign in</title>
+    <link rel="stylesheet" href="/css/login.css">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+<div class="auth-shell" data-auth-root>
+    <div class="auth-card" data-mode="signin"
+         th:attr="data-signin-title=#{login.meta.title.signin},
+                  data-register-title=#{login.meta.title.register}">
+        <section class="auth-view auth-view--signin" data-view="signin">
+            <header class="auth-header">
+                <h1 class="auth-title" th:text="#{login.signin.title}">Sign in</h1>
+                <p class="auth-switch">
+                    <span th:text="#{login.signin.subtitle}">Or</span>
+                    <a href="#" data-action="show-register" th:text="#{login.signin.toggle}">Create Account</a>
+                </p>
+            </header>
+
+            <form method="post" action="/login" class="auth-form" novalidate>
+                <label class="auth-field">
+                    <span class="auth-field__label" th:text="#{login.form.email}">Email Address</span>
+                    <input class="auth-field__input" type="email" name="username" autocomplete="username" required>
+                </label>
+                <label class="auth-field auth-field--with-toggle">
+                    <span class="auth-field__label" th:text="#{login.form.password}">Password</span>
+                    <div class="auth-field__control">
+                        <input class="auth-field__input" type="password" name="password" autocomplete="current-password" required>
+                        <button type="button" class="auth-field__toggle" data-toggle-password
+                                th:attr="data-label-show=#{login.form.password.show},
+                                         data-label-hide=#{login.form.password.hide},
+                                         aria-label=#{login.form.password.show}">
+                            <span class="auth-field__toggle-icon" aria-hidden="true"></span>
+                            <span class="sr-only" th:text="#{login.form.password.show}">Show password</span>
+                        </button>
+                    </div>
+                </label>
+                <button type="submit" class="auth-button" th:text="#{login.form.submit}">Sign in</button>
+                <div th:if="${loginError}" class="auth-feedback auth-feedback--error" th:text="#{login.form.error}">Invalid email or password. Try again.</div>
+            </form>
+
+            <div class="auth-divider" th:text="#{login.separator}">or continue with</div>
+
+            <div class="auth-providers">
+                <button type="button" class="provider" aria-label="Google">
+                    <span class="provider__icon provider__icon--google" aria-hidden="true"></span>
+                </button>
+                <button type="button" class="provider" aria-label="Apple">
+                    <span class="provider__icon provider__icon--apple" aria-hidden="true"></span>
+                </button>
+                <button type="button" class="provider" aria-label="Facebook">
+                    <span class="provider__icon provider__icon--facebook" aria-hidden="true"></span>
+                </button>
+            </div>
+
+            <a href="#" class="auth-link" th:text="#{login.forgot}">Forgot login?</a>
+            <p class="auth-note" th:text="#{login.notice}">Secure login. Google Terms & Privacy apply.</p>
+        </section>
+
+        <section class="auth-view auth-view--register" data-view="register" hidden aria-hidden="true">
+            <header class="auth-header">
+                <h1 class="auth-title" th:text="#{login.register.titleShort}">Create your account</h1>
+                <p class="auth-switch">
+                    <span th:text="#{login.signin.subtitle}">Or</span>
+                    <a href="#" data-action="show-signin" th:text="#{login.register.toggle}">Back to sign in</a>
+                </p>
+            </header>
+
+            <form id="register-form" class="auth-form" novalidate
+                  th:attr="data-success-message=#{login.register.success},
+                           data-error-generic=#{login.register.error.generic},
+                           data-error-network=#{login.register.error.network},
+                           data-error-mismatch=#{login.register.error.mismatch},
+                           data-error-empty=#{login.register.error.empty},
+                           data-error-email=#{login.register.error.email},
+                           data-error-password=#{login.register.error.password}">
+                <label class="auth-field">
+                    <span class="auth-field__label" th:text="#{login.form.email}">Email Address</span>
+                    <input class="auth-field__input" type="email" name="email" autocomplete="email" required>
+                </label>
+                <label class="auth-field auth-field--with-toggle">
+                    <span class="auth-field__label" th:text="#{login.form.password}">Password</span>
+                    <div class="auth-field__control">
+                        <input class="auth-field__input" type="password" name="password" autocomplete="new-password" required>
+                        <button type="button" class="auth-field__toggle" data-toggle-password
+                                th:attr="data-label-show=#{login.form.password.show},
+                                         data-label-hide=#{login.form.password.hide},
+                                         aria-label=#{login.form.password.show}">
+                            <span class="auth-field__toggle-icon" aria-hidden="true"></span>
+                            <span class="sr-only" th:text="#{login.form.password.show}">Show password</span>
+                        </button>
+                    </div>
+                </label>
+                <label class="auth-field auth-field--with-toggle">
+                    <span class="auth-field__label" th:text="#{login.form.confirmPassword}">Confirm password</span>
+                    <div class="auth-field__control">
+                        <input class="auth-field__input" type="password" name="confirmPassword" autocomplete="new-password" required>
+                        <button type="button" class="auth-field__toggle" data-toggle-password
+                                th:attr="data-label-show=#{login.form.password.show},
+                                         data-label-hide=#{login.form.password.hide},
+                                         aria-label=#{login.form.password.show}">
+                            <span class="auth-field__toggle-icon" aria-hidden="true"></span>
+                            <span class="sr-only" th:text="#{login.form.password.show}">Show password</span>
+                        </button>
+                    </div>
+                </label>
+                <p class="auth-hint" th:text="#{login.form.requirements}">At least 8 characters, upper and lower case letters, a number and one of @$!%*?&.</p>
+                <button type="submit" class="auth-button auth-button--ghost" th:text="#{login.register.submit}">Create account</button>
+                <div class="auth-feedback" data-feedback></div>
+            </form>
+
+            <p class="auth-note" th:text="#{login.register.footer}">By submitting the form you agree to the EasyShop privacy policy.</p>
+        </section>
+    </div>
+</div>
+<script src="/js/login.js" defer></script>
+</body>
+</html>
