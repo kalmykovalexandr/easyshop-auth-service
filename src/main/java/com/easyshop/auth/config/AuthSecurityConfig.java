@@ -108,10 +108,10 @@ public class AuthSecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .authorizeHttpRequests((authorize) -> authorize
                         .requestMatchers("/login", "/error", "/webjars/**",
-                                "/healthz", "/readyz", "/api/auth/**", "/.well-known/**").permitAll()
+                                "/healthz", "/readyz", "/api/auth/**", "/.well-known/**", "/css/**", "/images/**", "/js/**", "/favicon.ico").permitAll()
                         .anyRequest().authenticated()
                 )
-                .formLogin(Customizer.withDefaults())
+                .formLogin(form -> form.loginPage("/login").permitAll())
                 .authenticationProvider(authProvider);
 
         return http.build();

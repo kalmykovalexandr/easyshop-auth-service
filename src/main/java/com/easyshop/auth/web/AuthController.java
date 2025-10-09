@@ -2,9 +2,14 @@ package com.easyshop.auth.web;
 
 import com.easyshop.auth.service.AuthService;
 import com.easyshop.auth.web.dto.AuthDto;
-import jakarta.validation.*;
-import org.springframework.http.*;
-import org.springframework.web.bind.annotation.*;
+import jakarta.validation.Valid;
+import java.util.Map;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 public class AuthController {
@@ -15,37 +20,34 @@ public class AuthController {
     }
 
     @GetMapping("/healthz")
-    public ResponseEntity<Void> health() {
-        return ResponseEntity.ok().build();
+    public ResponseEntity<Map<String, Object>> health() {
+        return ResponseEntity.ok(Map.of("ok", true));
     }
 
     @GetMapping("/readyz")
-    public ResponseEntity<Void> ready() {
-        return ResponseEntity.ok().build();
+    public ResponseEntity<Map<String, Object>> ready() {
+        return ResponseEntity.ok(Map.of("ok", true));
     }
 
     @PostMapping("/api/auth/register")
-    public ResponseEntity<?> register(@Valid @RequestBody AuthDto d) {
-        if (!service.register(d)) {
-            String message = "Email already used or password does not meet requirements. " + service.getPasswordValidationMessage();
+    public ResponseEntity<Map<String, Object>> register(@Valid @RequestBody AuthDto dto) {
+        if (!service.register(dto)) {
+            String message = "Email already used or password does not meet requirements. "
+                    + service.getPasswordValidationMessage();
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(org.springframework.http.ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, message));
+                    .body(Map.of(
+                            "ok", false,
+                            "detail", message
+                    ));
         }
-        return ResponseEntity.ok().build();
-    }
-
-    @PostMapping("/api/auth/login")
-    public ResponseEntity<?> login(@Valid @RequestBody AuthDto d) {
-        boolean isValid = service.login(d);
-        if (!isValid)
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(org.springframework.http.ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Invalid credentials"));
-        return ResponseEntity.ok().build();
+        return ResponseEntity.ok(Map.of(
+                "ok", true,
+                "message", "Registration successful"
+        ));
     }
 
     @GetMapping("/api/auth/password-requirements")
     public ResponseEntity<String> getPasswordRequirements() {
         return ResponseEntity.ok(service.getPasswordValidationMessage());
     }
-
 }

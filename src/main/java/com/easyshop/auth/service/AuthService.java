@@ -43,11 +43,6 @@ public class AuthService {
         return true;
     }
 
-    public boolean login(AuthDto d) {
-        var u = users.findByEmail(d.email().toLowerCase().trim()).orElse(null);
-        return u != null && enc.matches(d.password(), u.getPassword());
-    }
-
     private boolean isValidPassword(String password) {
         if (password == null || password.length() < 8) {
             return false;
