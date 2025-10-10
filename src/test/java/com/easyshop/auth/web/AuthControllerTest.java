@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.easyshop.auth.model.RegistrationResult;
 import com.easyshop.auth.service.AuthService;
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.BeforeEach;
@@ -51,7 +52,8 @@ class AuthControllerTest {
 
     @Test
     void registerSuccessfully() throws Exception {
-        when(authService.register(any())).thenReturn(true);
+        when(authService.register(any())).thenReturn(RegistrationResult.successful());
+        when(authService.getRegistrationSuccessMessage()).thenReturn("Registration successful");
 
         mockMvc.perform(post("/api/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -63,7 +65,7 @@ class AuthControllerTest {
 
     @Test
     void registerReturnsErrorDetails() throws Exception {
-        when(authService.register(any())).thenReturn(false);
+        when(authService.register(any())).thenReturn(RegistrationResult.failure(false, true));
         when(authService.getPasswordValidationMessage()).thenReturn("Password requirements");
 
         mockMvc.perform(post("/api/auth/register")

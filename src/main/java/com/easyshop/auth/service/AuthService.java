@@ -1,57 +1,85 @@
 package com.easyshop.auth.service;
 
+import com.easyshop.auth.context.UserContext;
 import com.easyshop.auth.entity.User;
 import com.easyshop.auth.repository.UserRepository;
-
+import com.easyshop.auth.model.RegistrationResult;
 import com.easyshop.auth.web.dto.AuthDto;
+import java.util.regex.Pattern;
+import java.util.Locale;
+import org.springframework.context.MessageSource;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-
-import java.util.regex.Pattern;
 
 @Service
 public class AuthService {
     private final UserRepository users;
-    private final PasswordEncoder enc;
+    private final PasswordEncoder passwordEncoder;
+    private final MessageSource messageSource;
+    private final UserContext userContext;
 
-    // Password validation patterns
     private static final Pattern PASSWORD_PATTERN = Pattern.compile(
-        "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[@$!%*?&])[A-Za-z\\d@$!%*?&]{8,}$"
+            "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[@$!%*?&])[A-Za-z\\d@$!%*?&]{8,}$"
     );
 
-    public AuthService(UserRepository users, PasswordEncoder enc) {
+    public AuthService(UserRepository users,
+                       PasswordEncoder passwordEncoder,
+                       MessageSource messageSource,
+                       UserContext userContext) {
         this.users = users;
-        this.enc = enc;
+        this.passwordEncoder = passwordEncoder;
+        this.messageSource = messageSource;
+        this.userContext = userContext;
     }
 
-    public boolean register(AuthDto d) {
-        if (users.existsByEmail(d.email())) {
-            return false;
+    public RegistrationResult register(AuthDto dto) {
+        String normalizedEmail = normalizeEmail(dto.email());
+        boolean emailInUse = users.existsByEmail(normalizedEmail);
+        boolean weakPassword = !isValidPassword(dto.password());
+
+        if (emailInUse || weakPassword) {
+            return RegistrationResult.failure(emailInUse, weakPassword);
         }
-        
-        // Validate password strength
-        if (!isValidPassword(d.password())) {
-            return false;
-        }
-        
+
         User user = new User();
-        user.setEmail(d.email().toLowerCase().trim());
-        user.setPassword(enc.encode(d.password()));
+        user.setEmail(normalizedEmail);
+        user.setPassword(passwordEncoder.encode(dto.password()));
         user.setRole(User.Role.USER);
-        user.setUsername(d.email().toLowerCase().trim()); // Use email as username
+        user.setUsername(normalizedEmail);
         users.save(user);
-        return true;
+        return RegistrationResult.successful();
+    }
+
+    private String normalizeEmail(String email) {
+        return email == null ? "" : email.trim().toLowerCase(Locale.ROOT);
     }
 
     private boolean isValidPassword(String password) {
         if (password == null || password.length() < 8) {
             return false;
         }
-        
         return PASSWORD_PATTERN.matcher(password).matches();
     }
 
-    public String getPasswordValidationMessage() {
-        return "Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, one digit, and one special character (@$!%*?&)";
+    private Locale resolveLocale() {
+        if (userContext != null && userContext.hasLocale()) {
+            return userContext.getLocale();
+        }
+        Locale locale = LocaleContextHolder.getLocale();
+        return locale != null ? locale : Locale.ENGLISH;
     }
+
+    public String getEmailInUseMessage() {
+        return messageSource.getMessage("auth.register.error.emailUsed", null, resolveLocale());
+    }
+
+    public String getPasswordValidationMessage() {
+        return messageSource.getMessage("auth.password.requirements", null, resolveLocale());
+    }
+
+    public String getRegistrationSuccessMessage() {
+        return messageSource.getMessage("auth.register.success", null, resolveLocale());
+    }
+
 }
