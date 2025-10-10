@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.easyshop.auth.model.EmailVerificationStatus;
 import com.easyshop.auth.model.RegistrationResult;
 import com.easyshop.auth.service.AuthService;
 import org.hamcrest.Matchers;
@@ -53,14 +54,14 @@ class AuthControllerTest {
     @Test
     void registerSuccessfully() throws Exception {
         when(authService.register(any())).thenReturn(RegistrationResult.successful());
-        when(authService.getRegistrationSuccessMessage()).thenReturn("Registration successful");
+        when(authService.getRegistrationSuccessMessage()).thenReturn("Registration successful. Check your e-mail to activate your account.");
 
         mockMvc.perform(post("/api/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"email\":\"user@example.com\",\"password\":\"S3cure@123\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.ok").value(true))
-                .andExpect(jsonPath("$.message").value("Registration successful"));
+                .andExpect(jsonPath("$.message").value("Registration successful. Check your e-mail to activate your account."));
     }
 
     @Test
@@ -74,5 +75,31 @@ class AuthControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.ok").value(false))
                 .andExpect(jsonPath("$.detail").value(Matchers.containsString("Password requirements")));
+    }
+
+    @Test
+    void verifyEmailSuccess() throws Exception {
+        when(authService.verifyEmail("token")).thenReturn(EmailVerificationStatus.VERIFIED);
+        when(authService.getVerificationMessage(EmailVerificationStatus.VERIFIED))
+                .thenReturn("Email verified. You can sign in now.");
+
+        mockMvc.perform(get("/api/auth/verify").param("token", "token"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.ok").value(true))
+                .andExpect(jsonPath("$.status").value("VERIFIED"))
+                .andExpect(jsonPath("$.message").value("Email verified. You can sign in now."));
+    }
+
+    @Test
+    void verifyEmailExpired() throws Exception {
+        when(authService.verifyEmail("token")).thenReturn(EmailVerificationStatus.EXPIRED);
+        when(authService.getVerificationMessage(EmailVerificationStatus.EXPIRED))
+                .thenReturn("Verification link has expired. Request a new one.");
+
+        mockMvc.perform(get("/api/auth/verify").param("token", "token"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.ok").value(false))
+                .andExpect(jsonPath("$.status").value("EXPIRED"))
+                .andExpect(jsonPath("$.message").value("Verification link has expired. Request a new one."));
     }
 }

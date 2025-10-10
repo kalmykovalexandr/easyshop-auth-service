@@ -405,10 +405,6 @@
       resetValidationState()
       resetPasswordToggles()
       setFeedback('success', messages.success)
-      window.setTimeout(() => {
-        setFeedback('info', '')
-        setMode('signin')
-      }, 1500)
     } catch (error) {
       setFeedback('error', messages.errorNetwork)
     } finally {

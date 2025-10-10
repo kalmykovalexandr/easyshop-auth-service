@@ -45,8 +45,8 @@
                 <button type="submit" class="auth-button" th:text="#{login.form.submit}">Sign in</button>
                 <div class="auth-feedback auth-feedback--error"
                  data-signin-feedback
-                 th:attr="hidden=${loginError} ? null : true"
-                 th:text="${loginError} ? #{login.form.error} : ''">Invalid email or password. Try again.</div>
+                 th:attr="hidden=${loginErrorCode} != null ? null : true, data-error-code=${loginErrorCode} ?: ''"
+                 th:text="${loginErrorCode} == null ? '' : (loginErrorCode == 'disabled' ? #{login.form.error.disabled} : #{login.form.error})">Invalid email or password. Try again.</div>
             </form>
 
             <div class="auth-divider" th:text="#{login.separator}">or</div>
