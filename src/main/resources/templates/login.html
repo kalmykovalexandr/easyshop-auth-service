@@ -17,7 +17,6 @@
             <header class="auth-header">
                 <h1 class="auth-title" th:text="#{login.signin.title}">Sign in</h1>
                 <p class="auth-switch">
-                    <span th:text="#{login.signin.subtitle}">Or</span>
                     <a href="#" data-action="show-register" th:text="#{login.signin.toggle}">Create Account</a>
                 </p>
             </header>
@@ -69,9 +68,10 @@
 
         <section class="auth-view auth-view--register" data-view="register" hidden aria-hidden="true">
             <header class="auth-header">
-                <h1 class="auth-title" th:text="#{login.register.titleShort}">Create your account</h1>
+                <h1 class="auth-title"
+                th:attr="data-title-default=#{login.register.titleShort}, data-title-success=#{login.register.titleSuccess}"
+                th:text="#{login.register.titleShort}">Create your account</h1>
                 <p class="auth-switch">
-                    <span th:text="#{login.signin.subtitle}">Or</span>
                     <a href="#" data-action="show-signin" th:text="#{login.register.toggle}">Back to sign in</a>
                 </p>
             </header>
@@ -126,12 +126,11 @@
 
             <div class="auth-success" data-register-success hidden aria-hidden="true">
                 <div class="auth-success__status">
-                    <span class="auth-success__icon" aria-hidden="true"></span>
                     <p class="auth-success__message" data-success-message></p>
                 </div>
                 <div class="auth-success__feedback" role="status" aria-live="polite" data-success-feedback></div>
                 <div class="auth-success__actions">
-                    <button type="button" class="auth-button" data-action="resend-verification" th:text="#{login.register.modal.resend}">Send again</button>
+                    <button type="button" class="auth-button" data-action="show-signin" th:text="#{login.register.toggle}">Back to sign in</button>
                     <a class="auth-button auth-button--secondary" data-action="go-home" th:href="@{/}" th:text="#{login.register.modal.home}">Go to store</a>
                 </div>
             </div>

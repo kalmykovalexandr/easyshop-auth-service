@@ -338,6 +338,14 @@ input[type="password"]::-ms-clear {
   display: none;
 }
 
+.auth-view--register[data-state="success"] .auth-title {
+  color: #15803d;
+}
+
+.auth-view--register[data-state="success"] .auth-switch {
+  display: none;
+}
+
 .auth-success {
   display: grid;
   gap: 18px;
@@ -352,32 +360,9 @@ input[type="password"]::-ms-clear {
   display: flex;
   align-items: flex-start;
   gap: 12px;
-  padding: 16px;
-  border-radius: 14px;
-  background: #ecfdf3;
-  border: 1px solid #bbf7d0;
+  padding: 0;
 }
 
-.auth-success__icon {
-  flex: 0 0 32px;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background-color: #16a34a;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.auth-success__icon::before {
-  content: "";
-  width: 16px;
-  height: 12px;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-size: contain;
-  display: block;
-}
 
 .auth-success__message {
   margin: 0;
@@ -385,6 +370,24 @@ input[type="password"]::-ms-clear {
   line-height: 1.55;
   color: #14532d;
 }
+
+.auth-success__link {
+  color: #2563eb;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.auth-success__link:hover {
+  text-decoration: underline;
+}
+
+.auth-success__link--disabled {
+  color: #9ca3af;
+  pointer-events: none;
+  cursor: default;
+  text-decoration: none;
+}
+
 
 .auth-success__feedback {
   min-height: 18px;

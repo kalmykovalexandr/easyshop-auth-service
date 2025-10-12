@@ -9,10 +9,14 @@
   const registerSection = root.querySelector('[data-view="register"]')
   const registerForm = root.querySelector('#register-form')
 
+  const registerTitle = registerSection?.querySelector('.auth-title')
+  const registerTitleDefault = registerTitle?.dataset?.titleDefault || registerTitle?.textContent?.trim() || ''
+  const registerTitleSuccess = registerTitle?.dataset?.titleSuccess || registerTitleDefault
+
   const successContainer = registerSection?.querySelector('[data-register-success]')
   const successMessage = successContainer?.querySelector('[data-success-message]')
   const successFeedback = successContainer?.querySelector('[data-success-feedback]')
-  const successResendButton = successContainer?.querySelector('[data-action="resend-verification"]')
+  let successResendButton = successContainer?.querySelector('[data-action="resend-verification"]')
   const successHomeLink = successContainer?.querySelector('[data-action="go-home"]')
 
   const passwordToggleButtons = Array.from(root.querySelectorAll('[data-toggle-password]'))
@@ -24,6 +28,12 @@
   function setRegisterState(state) {
     if (registerSection) {
       registerSection.dataset.state = state
+    }
+    if (registerTitle) {
+      const nextTitle = state === 'success' ? registerTitleSuccess : registerTitleDefault
+      if (nextTitle) {
+        registerTitle.textContent = nextTitle
+      }
     }
   }
 
@@ -280,9 +290,6 @@
       window.location.assign(homeUrl)
     })
   }
-  if (successResendButton && !resendUrl) {
-    successResendButton.disabled = true
-  }
 
   const emailField = registerForm.querySelector('input[name="email"]')
   const passwordField = registerForm.querySelector('input[name="password"]')
@@ -301,6 +308,40 @@
     errorPassword: registerForm.dataset.errorPassword || 'Password must be at least 8 characters and include upper and lower case letters, a number, and one of @$!%*?&.',
     resendSuccess: registerForm.dataset.resendSuccess || 'We sent a new verification e-mail.',
     resendError: registerForm.dataset.resendError || 'We could not resend the e-mail. Try again later.'
+  }
+  function setResendDisabled(isDisabled) {
+    if (!successResendButton) {
+      return
+    }
+    successResendButton.setAttribute('aria-disabled', isDisabled ? 'true' : 'false')
+    successResendButton.classList.toggle('auth-success__link--disabled', Boolean(isDisabled))
+    if (isDisabled) {
+      successResendButton.setAttribute('tabindex', '-1')
+    } else {
+      successResendButton.removeAttribute('tabindex')
+    }
+  }
+
+  function isResendDisabled() {
+    return !successResendButton || successResendButton.getAttribute('aria-disabled') === 'true'
+  }
+
+  function refreshSuccessResendButton() {
+    if (!successContainer) {
+      return
+    }
+    const next = successContainer.querySelector('[data-action="resend-verification"]')
+    if (successResendButton === next) {
+      return
+    }
+    if (successResendButton) {
+      successResendButton.removeEventListener('click', handleResendVerification)
+    }
+    successResendButton = next
+    if (successResendButton) {
+      successResendButton.addEventListener('click', handleResendVerification)
+      setResendDisabled(!resendUrl)
+    }
   }
 
   function buildSuccessMessage(email) {
@@ -340,8 +381,9 @@
     }
     setRegisterState('success')
     if (successMessage) {
-      successMessage.textContent = message
+      successMessage.innerHTML = message
     }
+    refreshSuccessResendButton()
     clearSuccessFeedback()
     if (registerForm) {
       registerForm.hidden = true
@@ -352,8 +394,8 @@
     successContainer.setAttribute('aria-hidden', 'false')
     syncCardHeight()
     window.requestAnimationFrame(() => {
-      if (successResendButton && !successResendButton.disabled) {
-        successResendButton.focus()
+      if (!isResendDisabled()) {
+        successResendButton?.focus()
       } else if (successHomeLink) {
         successHomeLink.focus()
       }
@@ -388,8 +430,11 @@
       setSuccessFeedback('error', messages.resendError)
       return
     }
+    if (isResendDisabled()) {
+      return
+    }
 
-    successResendButton.disabled = true
+    setResendDisabled(true)
     clearSuccessFeedback()
 
     try {
@@ -412,7 +457,7 @@
     } catch (error) {
       setSuccessFeedback('error', messages.resendError)
     } finally {
-      successResendButton.disabled = false
+      setResendDisabled(false)
     }
   }
 
@@ -492,9 +537,7 @@
   }
 
 
-  if (successResendButton) {
-    successResendButton.addEventListener('click', handleResendVerification)
-  }
+  refreshSuccessResendButton()
 
   async function handleSubmit(event) {
     event.preventDefault()
@@ -571,9 +614,3 @@
 
   registerForm.addEventListener('submit', handleSubmit)
 })()
-
-
-
-
-
-
