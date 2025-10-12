@@ -9,7 +9,23 @@
   const registerSection = root.querySelector('[data-view="register"]')
   const registerForm = root.querySelector('#register-form')
 
+  const successContainer = registerSection?.querySelector('[data-register-success]')
+  const successMessage = successContainer?.querySelector('[data-success-message]')
+  const successFeedback = successContainer?.querySelector('[data-success-feedback]')
+  const successResendButton = successContainer?.querySelector('[data-action="resend-verification"]')
+  const successHomeLink = successContainer?.querySelector('[data-action="go-home"]')
+
   const passwordToggleButtons = Array.from(root.querySelectorAll('[data-toggle-password]'))
+
+  if (registerSection && !registerSection.dataset.state) {
+    registerSection.dataset.state = 'form'
+  }
+
+  function setRegisterState(state) {
+    if (registerSection) {
+      registerSection.dataset.state = state
+    }
+  }
 
   function measureViewHeight(view) {
     if (!card || !view) {
@@ -75,6 +91,7 @@
       return
     }
     card.setAttribute('data-mode', mode)
+    showRegisterForm()
 
     if (registerSection) {
       const isRegister = mode === 'register'
@@ -250,6 +267,22 @@
   if (!registerForm) {
     return
   }
+  let lastSubmittedEmail = null
+  let previousBodyOverflow = ''
+  const resendUrl = registerForm.dataset.resendUrl || ''
+  const homeUrl = registerForm.dataset.homeUrl || ''
+  if (successHomeLink && homeUrl) {
+    successHomeLink.setAttribute('href', homeUrl)
+    successHomeLink.addEventListener('click', (event) => {
+      if (event.defaultPrevented) {
+        return
+      }
+      window.location.assign(homeUrl)
+    })
+  }
+  if (successResendButton && !resendUrl) {
+    successResendButton.disabled = true
+  }
 
   const emailField = registerForm.querySelector('input[name="email"]')
   const passwordField = registerForm.querySelector('input[name="password"]')
@@ -257,14 +290,130 @@
   const feedback = registerForm.querySelector('[data-feedback]')
   const submitButton = registerForm.querySelector('button[type="submit"]')
 
+  const successTemplate = registerForm?.dataset?.successTemplate || ''
   const messages = {
-    success: registerForm.dataset.successMessage || 'Account created. You can sign in now.',
+    successFallback: registerForm?.dataset?.successFallback || 'Registration successful. Check your e-mail to activate your account.',
     errorGeneric: registerForm.dataset.errorGeneric || 'We could not create the account. Please try again later.',
     errorNetwork: registerForm.dataset.errorNetwork || 'Network error. Please try again.',
     errorMismatch: registerForm.dataset.errorMismatch || 'Passwords do not match.',
     errorEmpty: registerForm.dataset.errorEmpty || 'Fill in all fields.',
     errorEmail: registerForm.dataset.errorEmail || 'Enter a valid e-mail address.',
-    errorPassword: registerForm.dataset.errorPassword || 'Password must be at least 8 characters and include upper and lower case letters, a number, and one of @$!%*?&.'
+    errorPassword: registerForm.dataset.errorPassword || 'Password must be at least 8 characters and include upper and lower case letters, a number, and one of @$!%*?&.',
+    resendSuccess: registerForm.dataset.resendSuccess || 'We sent a new verification e-mail.',
+    resendError: registerForm.dataset.resendError || 'We could not resend the e-mail. Try again later.'
+  }
+
+  function buildSuccessMessage(email) {
+    if (!successTemplate || !email) {
+      return messages.successFallback
+    }
+    let message = successTemplate
+    const placeholders = [/%EMAIL%/g, /{{\\s*email\\s*}}/gi]
+    placeholders.forEach((pattern) => {
+      message = message.replace(pattern, email)
+    })
+    return message
+  }
+
+  function clearSuccessFeedback() {
+    if (!successFeedback) {
+      return
+    }
+    successFeedback.textContent = ''
+    successFeedback.classList.remove('auth-success__feedback--error')
+  }
+
+  function setSuccessFeedback(type, message) {
+    if (!successFeedback) {
+      return
+    }
+    successFeedback.textContent = message || ''
+    successFeedback.classList.remove('auth-success__feedback--error')
+    if (type === 'error') {
+      successFeedback.classList.add('auth-success__feedback--error')
+    }
+  }
+
+  function showSuccessView(message) {
+    if (!successContainer) {
+      return
+    }
+    setRegisterState('success')
+    if (successMessage) {
+      successMessage.textContent = message
+    }
+    clearSuccessFeedback()
+    if (registerForm) {
+      registerForm.hidden = true
+      registerForm.setAttribute('aria-hidden', 'true')
+      registerForm.style.display = 'none'
+    }
+    successContainer.hidden = false
+    successContainer.setAttribute('aria-hidden', 'false')
+    syncCardHeight()
+    window.requestAnimationFrame(() => {
+      if (successResendButton && !successResendButton.disabled) {
+        successResendButton.focus()
+      } else if (successHomeLink) {
+        successHomeLink.focus()
+      }
+    })
+  }
+
+  function showRegisterForm() {
+    setRegisterState('form')
+    if (registerForm) {
+      registerForm.hidden = false
+      registerForm.setAttribute('aria-hidden', 'false')
+      if (registerForm.style) {
+        registerForm.style.removeProperty('display')
+      }
+    }
+    if (successContainer) {
+      successContainer.hidden = true
+      successContainer.setAttribute('aria-hidden', 'true')
+    }
+    clearSuccessFeedback()
+    syncCardHeight()
+  }
+
+  async function handleResendVerification(event) {
+    if (event) {
+      event.preventDefault()
+    }
+    if (!successResendButton) {
+      return
+    }
+    if (!resendUrl || !lastSubmittedEmail) {
+      setSuccessFeedback('error', messages.resendError)
+      return
+    }
+
+    successResendButton.disabled = true
+    clearSuccessFeedback()
+
+    try {
+      const response = await fetch(resendUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json'
+        },
+        body: JSON.stringify({ email: lastSubmittedEmail })
+      })
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null)
+        const detail = payload && (payload.detail || payload.message)
+        throw new Error(detail || 'Failed to resend')
+      }
+
+      setSuccessFeedback('success', messages.resendSuccess)
+    } catch (error) {
+      setSuccessFeedback('error', messages.resendError)
+    } finally {
+      successResendButton.disabled = false
+    }
   }
 
   const emailPattern = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/
@@ -342,6 +491,11 @@
     })
   }
 
+
+  if (successResendButton) {
+    successResendButton.addEventListener('click', handleResendVerification)
+  }
+
   async function handleSubmit(event) {
     event.preventDefault()
 
@@ -401,10 +555,13 @@
         return
       }
 
+      const successMessage = buildSuccessMessage(email)
+      lastSubmittedEmail = email
       registerForm.reset()
       resetValidationState()
       resetPasswordToggles()
-      setFeedback('success', messages.success)
+      setFeedback('info', '')
+      showSuccessView(successMessage)
     } catch (error) {
       setFeedback('error', messages.errorNetwork)
     } finally {
@@ -414,4 +571,9 @@
 
   registerForm.addEventListener('submit', handleSubmit)
 })()
+
+
+
+
+
 

@@ -77,13 +77,18 @@
             </header>
 
             <form id="register-form" class="auth-form" novalidate
-                  th:attr="data-success-message=#{login.register.success},
+                  th:attr="data-success-template=#{login.register.success},
+                           data-success-fallback=#{auth.register.success},
                            data-error-generic=#{login.register.error.generic},
                            data-error-network=#{login.register.error.network},
                            data-error-mismatch=#{login.register.error.mismatch},
                            data-error-empty=#{login.register.error.empty},
                            data-error-email=#{login.register.error.email},
-                           data-error-password=#{login.register.error.password}">
+                           data-error-password=#{login.register.error.password},
+                           data-resend-url=@{/api/auth/resend-verification},
+                           data-home-url=@{/},
+                           data-resend-success=#{login.register.modal.resendSuccess},
+                           data-resend-error=#{login.register.modal.resendError}">
                 <label class="auth-field">
                     <span class="auth-field__label" th:text="#{login.form.email}">E-mail</span>
                     <input class="auth-field__input" type="email" name="email" autocomplete="email" required>
@@ -118,6 +123,18 @@
                 <button type="submit" class="auth-button auth-button--ghost" th:text="#{login.register.submit}">Create account</button>
                 <div class="auth-feedback" data-feedback></div>
             </form>
+
+            <div class="auth-success" data-register-success hidden aria-hidden="true">
+                <div class="auth-success__status">
+                    <span class="auth-success__icon" aria-hidden="true"></span>
+                    <p class="auth-success__message" data-success-message></p>
+                </div>
+                <div class="auth-success__feedback" role="status" aria-live="polite" data-success-feedback></div>
+                <div class="auth-success__actions">
+                    <button type="button" class="auth-button" data-action="resend-verification" th:text="#{login.register.modal.resend}">Send again</button>
+                    <a class="auth-button auth-button--secondary" data-action="go-home" th:href="@{/}" th:text="#{login.register.modal.home}">Go to store</a>
+                </div>
+            </div>
 
             <p class="auth-note" th:text="#{login.register.footer}">By submitting the form you agree to the privacy policy.</p>
         </section>

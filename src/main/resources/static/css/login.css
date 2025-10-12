@@ -171,6 +171,11 @@ input[type="password"]::-ms-clear {
   padding: 12px 0;
   font-size: 0.96rem;
   font-weight: 600;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  text-decoration: none;
   background: linear-gradient(135deg, #4f46e5, #4338ca);
   color: #ffffff;
   cursor: pointer;
@@ -190,6 +195,17 @@ input[type="password"]::-ms-clear {
 
 .auth-button--ghost {
   background: #1f2933;
+}
+
+.auth-button--secondary {
+  background: #ffffff;
+  color: #1f2933;
+  border: 1px solid #d1d5db;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12);
+}
+
+.auth-button--secondary:hover {
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.18);
 }
 
 .auth-feedback {
@@ -317,3 +333,76 @@ input[type="password"]::-ms-clear {
     width: 24%;
   }
 }
+
+.auth-view--register[data-state="success"] .auth-form {
+  display: none;
+}
+
+.auth-success {
+  display: grid;
+  gap: 18px;
+  text-align: left;
+}
+
+.auth-success[hidden] {
+  display: none;
+}
+
+.auth-success__status {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 14px;
+  background: #ecfdf3;
+  border: 1px solid #bbf7d0;
+}
+
+.auth-success__icon {
+  flex: 0 0 32px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background-color: #16a34a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.auth-success__icon::before {
+  content: "";
+  width: 16px;
+  height: 12px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-size: contain;
+  display: block;
+}
+
+.auth-success__message {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.55;
+  color: #14532d;
+}
+
+.auth-success__feedback {
+  min-height: 18px;
+  font-size: 0.84rem;
+  color: #15803d;
+}
+
+.auth-success__feedback--error {
+  color: #d62839;
+}
+
+.auth-success__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.auth-success__actions .auth-button {
+  flex: none;
+}
+
