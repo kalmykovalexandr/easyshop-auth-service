@@ -349,7 +349,7 @@ input[type="password"]::-ms-clear {
 .auth-success {
   display: grid;
   gap: 18px;
-  text-align: left;
+  text-align: center;
 }
 
 .auth-success[hidden] {
@@ -358,7 +358,9 @@ input[type="password"]::-ms-clear {
 
 .auth-success__status {
   display: flex;
-  align-items: flex-start;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   gap: 12px;
   padding: 0;
 }
@@ -369,6 +371,12 @@ input[type="password"]::-ms-clear {
   font-size: 0.92rem;
   line-height: 1.55;
   color: #14532d;
+  text-align: center;
+}
+.auth-success__note {
+  display: block;
+  font-size: 0.84rem;
+  line-height: 1.5;
 }
 
 .auth-success__link {
@@ -393,6 +401,7 @@ input[type="password"]::-ms-clear {
   min-height: 18px;
   font-size: 0.84rem;
   color: #15803d;
+  text-align: center;
 }
 
 .auth-success__feedback--error {
@@ -408,4 +417,6 @@ input[type="password"]::-ms-clear {
 .auth-success__actions .auth-button {
   flex: none;
 }
+
+
 

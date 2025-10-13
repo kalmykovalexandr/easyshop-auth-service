@@ -18,6 +18,7 @@
   const successFeedback = successContainer?.querySelector('[data-success-feedback]')
   let successResendButton = successContainer?.querySelector('[data-action="resend-verification"]')
   const successHomeLink = successContainer?.querySelector('[data-action="go-home"]')
+  const registerNote = registerSection?.querySelector('.auth-note')
 
   const passwordToggleButtons = Array.from(root.querySelectorAll('[data-toggle-password]'))
 
@@ -33,6 +34,15 @@
       const nextTitle = state === 'success' ? registerTitleSuccess : registerTitleDefault
       if (nextTitle) {
         registerTitle.textContent = nextTitle
+      }
+    }
+    if (registerNote) {
+      if (state === 'success') {
+        registerNote.hidden = true
+        registerNote.setAttribute('aria-hidden', 'true')
+      } else {
+        registerNote.hidden = false
+        registerNote.removeAttribute('aria-hidden')
       }
     }
   }
