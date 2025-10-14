@@ -23,7 +23,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final MessageSource messageSource;
     private final UserContext userContext;
-    private final EmailVerificationService emailVerificationService;
+    private final EmailService emailService;
 
     private static final Pattern PASSWORD_PATTERN = Pattern.compile(
             "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[@$!%*?&])[A-Za-z\\d@$!%*?&]{8,}$"
@@ -33,12 +33,12 @@ public class AuthService {
                        PasswordEncoder passwordEncoder,
                        MessageSource messageSource,
                        UserContext userContext,
-                       EmailVerificationService emailVerificationService) {
+                       EmailService emailService) {
         this.users = users;
         this.passwordEncoder = passwordEncoder;
         this.messageSource = messageSource;
         this.userContext = userContext;
-        this.emailVerificationService = emailVerificationService;
+        this.emailService = emailService;
     }
 
     public RegistrationResult register(AuthDto dto) {
@@ -58,12 +58,12 @@ public class AuthService {
         user.setEnabled(false);
         users.save(user);
 
-        emailVerificationService.createAndSendToken(user, resolveLocale());
+        emailService.createAndSendToken(user, resolveLocale());
         return RegistrationResult.successful();
     }
 
     public EmailVerificationStatus verifyEmail(String token) {
-        return emailVerificationService.verify(token);
+        return emailService.verify(token);
     }
 
     public ResendVerificationResult resendVerification(String email) {
@@ -83,11 +83,11 @@ public class AuthService {
             return ResendVerificationResult.alreadyVerified(getResendAlreadyVerifiedMessage());
         }
 
-        Optional<Long> cooldownRemaining = emailVerificationService.findLatestToken(user)
+        Optional<Long> cooldownRemaining = emailService.findLatestToken(user)
                 .flatMap(token -> {
                     LocalDateTime now = LocalDateTime.now();
                     Duration elapsed = Duration.between(token.getCreatedAt(), now);
-                    Duration cooldown = emailVerificationService.getResendCooldown();
+                    Duration cooldown = emailService.getResendCooldown();
                     Duration remaining;
                     if (elapsed.isNegative()) {
                         remaining = cooldown;
@@ -105,7 +105,7 @@ public class AuthService {
             return ResendVerificationResult.rateLimited(getResendCooldownMessage(seconds), seconds);
         }
 
-        emailVerificationService.createAndSendToken(user, locale);
+        emailService.createAndSendResendToken(user, locale);
         return ResendVerificationResult.success(getResendSuccessMessage());
     }
 
