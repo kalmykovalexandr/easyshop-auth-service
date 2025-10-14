@@ -88,7 +88,8 @@
                            data-resend-url=@{/api/auth/resend-verification},
                            data-home-url=@{/},
                            data-resend-success=#{login.register.modal.resendSuccess},
-                           data-resend-error=#{login.register.modal.resendError}">
+                           data-resend-error=#{login.register.modal.resendError},
+                           data-resend-cooldown=#{login.register.modal.resendCooldown}">
                 <label class="auth-field">
                     <span class="auth-field__label" th:text="#{login.form.email}">E-mail</span>
                     <input class="auth-field__input" type="email" name="email" autocomplete="email" required>

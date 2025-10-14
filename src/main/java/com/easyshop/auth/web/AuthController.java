@@ -2,11 +2,14 @@ package com.easyshop.auth.web;
 
 import com.easyshop.auth.model.EmailVerificationStatus;
 import com.easyshop.auth.model.RegistrationResult;
+import com.easyshop.auth.model.ResendVerificationResult;
 import com.easyshop.auth.service.AuthService;
 import com.easyshop.auth.web.dto.AuthDto;
+import com.easyshop.auth.web.dto.ResendVerificationRequest;
 import jakarta.validation.Valid;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -80,5 +83,42 @@ public class AuthController {
         body.put("status", status.name());
         body.put("message", message);
         return ResponseEntity.status(httpStatus).body(body);
+    }
+
+    @PostMapping("/api/auth/resend-verification")
+    public ResponseEntity<Map<String, Object>> resendVerification(@Valid @RequestBody ResendVerificationRequest request) {
+        ResendVerificationResult result = service.resendVerification(request.email());
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("ok", result.status() == ResendVerificationResult.Status.SUCCESS);
+
+        return switch (result.status()) {
+            case SUCCESS -> {
+                body.put("message", result.message());
+                yield ResponseEntity.ok(body);
+            }
+            case RATE_LIMITED -> {
+                body.put("detail", result.message());
+                if (result.retryAfterSeconds() != null) {
+                    body.put("retryAfterSeconds", result.retryAfterSeconds());
+                }
+                ResponseEntity.BodyBuilder builder = ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS);
+                if (result.retryAfterSeconds() != null) {
+                    builder = builder.header(HttpHeaders.RETRY_AFTER, String.valueOf(result.retryAfterSeconds()));
+                }
+                yield builder.body(body);
+            }
+            case ALREADY_VERIFIED -> {
+                body.put("detail", result.message());
+                yield ResponseEntity.status(HttpStatus.CONFLICT).body(body);
+            }
+            case NOT_FOUND -> {
+                body.put("detail", result.message());
+                yield ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
+            }
+            case ERROR -> {
+                body.put("detail", result.message());
+                yield ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
+            }
+        };
     }
 }

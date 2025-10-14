@@ -8,6 +8,7 @@ import com.easyshop.auth.repository.UserRepository;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,15 +26,35 @@ public class EmailVerificationService {
     private final UserRepository userRepository;
     private final String verificationBaseUrl;
     private final Duration tokenTtl;
+    private final Duration resendCooldown;
 
     public EmailVerificationService(EmailVerificationTokenRepository tokenRepository,
                                     UserRepository userRepository,
                                     @Value("${easyshop.auth.verification-base-url:http://localhost:9001/api/auth/verify}") String verificationBaseUrl,
-                                    @Value("${easyshop.auth.verification-ttl-hours:24}") long tokenTtlHours) {
+                                    @Value("${easyshop.auth.verification-ttl-hours:24}") long tokenTtlHours,
+                                    @Value("${easyshop.auth.verification-resend-cooldown-seconds:60}") String resendCooldownSecondsValue) {
         this.tokenRepository = tokenRepository;
         this.userRepository = userRepository;
         this.verificationBaseUrl = verificationBaseUrl;
         this.tokenTtl = tokenTtlHours > 0 ? Duration.ofHours(tokenTtlHours) : DEFAULT_EXPIRATION;
+        long resolvedCooldownSeconds = parseLongOrDefault(resendCooldownSecondsValue, 60L);
+        this.resendCooldown = resolvedCooldownSeconds > 0 ? Duration.ofSeconds(resolvedCooldownSeconds) : Duration.ofSeconds(60);
+    }
+
+    private long parseLongOrDefault(String value, long defaultValue) {
+        if (value == null) {
+            return defaultValue;
+        }
+        String trimmed = value.trim();
+        if (trimmed.isEmpty()) {
+            return defaultValue;
+        }
+        try {
+            return Long.parseLong(trimmed);
+        } catch (NumberFormatException ex) {
+            log.warn("Invalid resend cooldown value '{}'. Falling back to {} seconds.", value, defaultValue);
+            return defaultValue;
+        }
     }
 
     @Transactional
@@ -46,6 +67,15 @@ public class EmailVerificationService {
 
         log.info("Email verification token generated for {} (locale {}): {}?token={}",
                 user.getEmail(), locale != null ? locale : Locale.ENGLISH, verificationBaseUrl, token);
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<EmailVerificationToken> findLatestToken(User user) {
+        return tokenRepository.findFirstByUserOrderByCreatedAtDesc(user);
+    }
+
+    public Duration getResendCooldown() {
+        return resendCooldown;
     }
 
     @Transactional

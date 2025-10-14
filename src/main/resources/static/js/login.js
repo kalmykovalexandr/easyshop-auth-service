@@ -17,6 +17,9 @@
   const successMessage = successContainer?.querySelector('[data-success-message]')
   const successFeedback = successContainer?.querySelector('[data-success-feedback]')
   let successResendButton = successContainer?.querySelector('[data-action="resend-verification"]')
+  let resendCooldownTimer = null
+  let resendCooldownExpiresAt = 0
+  let resendCooldownDetail = ''
   const successHomeLink = successContainer?.querySelector('[data-action="go-home"]')
   const registerNote = registerSection?.querySelector('.auth-note')
 
@@ -317,7 +320,8 @@
     errorEmail: registerForm.dataset.errorEmail || 'Enter a valid e-mail address.',
     errorPassword: registerForm.dataset.errorPassword || 'Password must be at least 8 characters and include upper and lower case letters, a number, and one of @$!%*?&.',
     resendSuccess: registerForm.dataset.resendSuccess || 'We sent a new verification e-mail.',
-    resendError: registerForm.dataset.resendError || 'We could not resend the e-mail. Try again later.'
+    resendError: registerForm.dataset.resendError || 'We could not resend the e-mail. Try again later.',
+    resendCooldown: registerForm.dataset.resendCooldown || ''
   }
   function setResendDisabled(isDisabled) {
     if (!successResendButton) {
@@ -330,6 +334,224 @@
     } else {
       successResendButton.removeAttribute('tabindex')
     }
+  }
+  const RESEND_COOLDOWN_PLACEHOLDERS = ['{{time}}', '{{TIME}}', '{{remaining}}', '{{REMAINING}}', '%TIME%', '%time%', '{time}', '{TIME}']
+
+  function cancelResendCooldownTimer() {
+    if (resendCooldownTimer) {
+      window.clearInterval(resendCooldownTimer)
+      resendCooldownTimer = null
+    }
+  }
+
+  function clearResendCooldown() {
+    cancelResendCooldownTimer()
+    resendCooldownExpiresAt = 0
+    resendCooldownDetail = ''
+    setResendDisabled(false)
+  }
+
+  function isResendCooldownActive() {
+    return resendCooldownExpiresAt > Date.now()
+  }
+
+  function formatResendCooldownTime(seconds) {
+    const remaining = Math.max(0, Math.ceil(seconds))
+    const minutes = Math.floor(remaining / 60)
+    const secs = remaining % 60
+    const mm = String(minutes).padStart(2, '0')
+    const ss = String(secs).padStart(2, '0')
+    return `${mm}:${ss}`
+  }
+
+  function buildResendCooldownMessage(remainingSeconds) {
+    const formatted = formatResendCooldownTime(remainingSeconds)
+    const template = messages.resendCooldown || ''
+    const token = RESEND_COOLDOWN_PLACEHOLDERS.find((placeholder) => template.includes(placeholder))
+    let message
+    if (template && token) {
+      message = template.split(token).join(formatted)
+    } else if (template) {
+      message = `${template} ${formatted}`
+    } else {
+      message = `${messages.resendError} ${formatted}`
+    }
+    const detail = resendCooldownDetail && resendCooldownDetail.trim()
+    if (detail && !message.trim().startsWith(detail)) {
+      return `${detail} ${message}`.trim()
+    }
+    return message.trim()
+  }
+
+  function updateResendCooldownFeedback() {
+    if (!isResendCooldownActive()) {
+      clearResendCooldown()
+      clearSuccessFeedback()
+      return
+    }
+    const remaining = Math.ceil((resendCooldownExpiresAt - Date.now()) / 1000)
+    if (remaining <= 0) {
+      clearResendCooldown()
+      clearSuccessFeedback()
+      return
+    }
+    const message = buildResendCooldownMessage(remaining)
+    setSuccessFeedback('error', message)
+  }
+
+  function startResendCooldown(seconds, detail) {
+    const waitSeconds = Math.max(1, Math.ceil(seconds))
+    resendCooldownDetail = detail || ''
+    cancelResendCooldownTimer()
+    resendCooldownExpiresAt = Date.now() + waitSeconds * 1000
+    setResendDisabled(true)
+    updateResendCooldownFeedback()
+    resendCooldownTimer = window.setInterval(updateResendCooldownFeedback, 1000)
+  }
+  function parseRetryAfterValue(value) {
+    if (value === null || value === undefined) {
+      return null
+    }
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return value > 0 ? value : null
+    }
+    if (typeof value === 'string') {
+      const trimmed = value.trim()
+      if (!trimmed) {
+        return null
+      }
+      const numeric = Number(trimmed)
+      if (!Number.isNaN(numeric)) {
+        return numeric > 0 ? numeric : null
+      }
+      const parsedDate = Date.parse(trimmed)
+      if (!Number.isNaN(parsedDate)) {
+        const diffSeconds = Math.ceil((parsedDate - Date.now()) / 1000)
+        return diffSeconds > 0 ? diffSeconds : null
+      }
+      return null
+    }
+    if (Array.isArray(value)) {
+      for (let i = 0; i < value.length; i += 1) {
+        const parsed = parseRetryAfterValue(value[i])
+        if (parsed) {
+          return parsed
+        }
+      }
+      return null
+    }
+    if (typeof value === 'object') {
+      const keys = [
+        'seconds',
+        'value',
+        'retryAfter',
+        'retry_after',
+        'wait',
+        'waitSeconds',
+        'wait_seconds',
+        'cooldown',
+        'cooldownSeconds',
+        'cooldown_seconds'
+      ]
+      for (let i = 0; i < keys.length; i += 1) {
+        const key = keys[i]
+        if (Object.prototype.hasOwnProperty.call(value, key)) {
+          const parsed = parseRetryAfterValue(value[key])
+          if (parsed) {
+            return parsed
+          }
+        }
+      }
+    }
+    return null
+  }
+
+  function extractRetryAfterSecondsFromPayload(payload) {
+    if (!payload || typeof payload !== 'object') {
+      return null
+    }
+    const keys = [
+      'retryAfterSeconds',
+      'retry_after_seconds',
+      'retryAfter',
+      'retry_after',
+      'waitSeconds',
+      'wait_seconds',
+      'cooldown',
+      'cooldownSeconds',
+      'cooldown_seconds'
+    ]
+    for (let i = 0; i < keys.length; i += 1) {
+      const key = keys[i]
+      if (Object.prototype.hasOwnProperty.call(payload, key)) {
+        const parsed = parseRetryAfterValue(payload[key])
+        if (parsed) {
+          return parsed
+        }
+      }
+    }
+    if (payload.meta && typeof payload.meta === 'object') {
+      const nested = extractRetryAfterSecondsFromPayload(payload.meta)
+      if (nested) {
+        return nested
+      }
+    }
+    if (payload.data && typeof payload.data === 'object') {
+      const nested = extractRetryAfterSecondsFromPayload(payload.data)
+      if (nested) {
+        return nested
+      }
+    }
+    return null
+  }
+
+  function extractResendErrorDetail(payload) {
+    if (!payload || typeof payload !== 'object') {
+      return ''
+    }
+    const candidates = [payload.detail, payload.message, payload.error, payload.reason]
+    for (let i = 0; i < candidates.length; i += 1) {
+      const candidate = candidates[i]
+      if (typeof candidate === 'string') {
+        const trimmed = candidate.trim()
+        if (trimmed) {
+          return trimmed
+        }
+      }
+    }
+    if (Array.isArray(payload.errors)) {
+      const joined = payload.errors
+        .map((item) => (typeof item === 'string' ? item.trim() : ''))
+        .filter(Boolean)
+        .join(' ')
+      if (joined) {
+        return joined
+      }
+    } else if (payload.errors && typeof payload.errors === 'object') {
+      const parts = []
+      Object.keys(payload.errors).forEach((key) => {
+        const value = payload.errors[key]
+        if (typeof value === 'string') {
+          const trimmed = value.trim()
+          if (trimmed) {
+            parts.push(trimmed)
+          }
+        } else if (Array.isArray(value)) {
+          value.forEach((item) => {
+            if (typeof item === 'string') {
+              const trimmed = item.trim()
+              if (trimmed) {
+                parts.push(trimmed)
+              }
+            }
+          })
+        }
+      })
+      if (parts.length > 0) {
+        return parts.join(' ')
+      }
+    }
+    return ''
   }
 
   function isResendDisabled() {
@@ -350,7 +572,7 @@
     successResendButton = next
     if (successResendButton) {
       successResendButton.addEventListener('click', handleResendVerification)
-      setResendDisabled(!resendUrl)
+      setResendDisabled(!resendUrl || isResendCooldownActive())
     }
   }
 
@@ -390,6 +612,7 @@
       return
     }
     setRegisterState('success')
+    clearResendCooldown()
     if (successMessage) {
       successMessage.innerHTML = message
     }
@@ -414,6 +637,7 @@
 
   function showRegisterForm() {
     setRegisterState('form')
+    clearResendCooldown()
     if (registerForm) {
       registerForm.hidden = false
       registerForm.setAttribute('aria-hidden', 'false')
@@ -447,6 +671,8 @@
     setResendDisabled(true)
     clearSuccessFeedback()
 
+    let waitSeconds = null
+    let detailMessage = ''
     try {
       const response = await fetch(resendUrl, {
         method: 'POST',
@@ -459,18 +685,58 @@
 
       if (!response.ok) {
         const payload = await response.json().catch(() => null)
-        const detail = payload && (payload.detail || payload.message)
-        throw new Error(detail || 'Failed to resend')
+        detailMessage = extractResendErrorDetail(payload)
+        const retryAfterHeader = response.headers && typeof response.headers.get === 'function'
+          ? response.headers.get('Retry-After')
+          : null
+        const headerRetryAfter = parseRetryAfterValue(retryAfterHeader)
+        const payloadRetryAfter = extractRetryAfterSecondsFromPayload(payload)
+        if (typeof payloadRetryAfter === 'number' && Number.isFinite(payloadRetryAfter)) {
+          waitSeconds = payloadRetryAfter
+        } else if (typeof headerRetryAfter === 'number' && Number.isFinite(headerRetryAfter)) {
+          waitSeconds = headerRetryAfter
+        } else {
+          waitSeconds = null
+        }
+        const error = new Error(detailMessage || messages.resendError)
+        if (waitSeconds) {
+          error.waitSeconds = waitSeconds
+        }
+        if (detailMessage) {
+          error.detail = detailMessage
+        }
+        throw error
       }
 
+      clearResendCooldown()
       setSuccessFeedback('success', messages.resendSuccess)
     } catch (error) {
-      setSuccessFeedback('error', messages.resendError)
+      const waitFromError = error && typeof error.waitSeconds === 'number' ? error.waitSeconds : null
+      const parsedWait = typeof waitFromError === 'number' && Number.isFinite(waitFromError)
+        ? Math.ceil(waitFromError)
+        : (typeof waitSeconds === 'number' && Number.isFinite(waitSeconds) ? Math.ceil(waitSeconds) : null)
+      const detailFromError = error && typeof error.detail === 'string' && error.detail.trim()
+        ? error.detail.trim()
+        : ''
+      const normalizedDetail = detailFromError || detailMessage || ''
+      if (parsedWait && parsedWait > 0) {
+        startResendCooldown(parsedWait, normalizedDetail)
+      } else {
+        let fallbackMessage = normalizedDetail
+        if (!fallbackMessage && error && typeof error.message === 'string' && error.message && error.message !== 'Failed to resend') {
+          fallbackMessage = error.message
+        }
+        if (!fallbackMessage) {
+          fallbackMessage = messages.resendError
+        }
+        setSuccessFeedback('error', fallbackMessage)
+      }
     } finally {
-      setResendDisabled(false)
+      if (!isResendCooldownActive()) {
+        setResendDisabled(false)
+      }
     }
   }
-
   const emailPattern = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/
   const passwordPattern = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/
 
@@ -624,3 +890,5 @@
 
   registerForm.addEventListener('submit', handleSubmit)
 })()
+
+

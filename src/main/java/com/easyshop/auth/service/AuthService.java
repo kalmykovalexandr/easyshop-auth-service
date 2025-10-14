@@ -4,9 +4,13 @@ import com.easyshop.auth.context.UserContext;
 import com.easyshop.auth.entity.User;
 import com.easyshop.auth.model.EmailVerificationStatus;
 import com.easyshop.auth.model.RegistrationResult;
+import com.easyshop.auth.model.ResendVerificationResult;
 import com.easyshop.auth.repository.UserRepository;
 import com.easyshop.auth.web.dto.AuthDto;
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.regex.Pattern;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
@@ -62,6 +66,49 @@ public class AuthService {
         return emailVerificationService.verify(token);
     }
 
+    public ResendVerificationResult resendVerification(String email) {
+        String normalizedEmail = normalizeEmail(email);
+        if (normalizedEmail.isBlank()) {
+            return ResendVerificationResult.error(getResendGenericErrorMessage());
+        }
+
+        Locale locale = resolveLocale();
+        Optional<User> maybeUser = users.findByEmail(normalizedEmail);
+        if (maybeUser.isEmpty()) {
+            return ResendVerificationResult.notFound(getResendGenericErrorMessage());
+        }
+
+        User user = maybeUser.get();
+        if (Boolean.TRUE.equals(user.getEnabled())) {
+            return ResendVerificationResult.alreadyVerified(getResendAlreadyVerifiedMessage());
+        }
+
+        Optional<Long> cooldownRemaining = emailVerificationService.findLatestToken(user)
+                .flatMap(token -> {
+                    LocalDateTime now = LocalDateTime.now();
+                    Duration elapsed = Duration.between(token.getCreatedAt(), now);
+                    Duration cooldown = emailVerificationService.getResendCooldown();
+                    Duration remaining;
+                    if (elapsed.isNegative()) {
+                        remaining = cooldown;
+                    } else if (elapsed.compareTo(cooldown) < 0) {
+                        remaining = cooldown.minus(elapsed);
+                    } else {
+                        return Optional.empty();
+                    }
+                    long seconds = Math.max(1, remaining.getSeconds());
+                    return Optional.of(seconds);
+                });
+
+        if (cooldownRemaining.isPresent()) {
+            long seconds = cooldownRemaining.get();
+            return ResendVerificationResult.rateLimited(getResendCooldownMessage(seconds), seconds);
+        }
+
+        emailVerificationService.createAndSendToken(user, locale);
+        return ResendVerificationResult.success(getResendSuccessMessage());
+    }
+
     private String normalizeEmail(String email) {
         return email == null ? "" : email.trim().toLowerCase(Locale.ROOT);
     }
@@ -92,6 +139,7 @@ public class AuthService {
     public String getRegistrationSuccessMessage() {
         return messageSource.getMessage("auth.register.success", null, resolveLocale());
     }
+
     public String getVerificationMessage(EmailVerificationStatus status) {
         String key = switch (status) {
             case VERIFIED -> "auth.verify.success";
@@ -102,4 +150,19 @@ public class AuthService {
         return messageSource.getMessage(key, null, resolveLocale());
     }
 
+    public String getResendSuccessMessage() {
+        return messageSource.getMessage("login.register.modal.resendSuccess", null, resolveLocale());
+    }
+
+    public String getResendGenericErrorMessage() {
+        return messageSource.getMessage("login.register.modal.resendError", null, resolveLocale());
+    }
+
+    public String getResendCooldownMessage(long seconds) {
+        return messageSource.getMessage("auth.resend.cooldown", new Object[]{seconds}, resolveLocale());
+    }
+
+    public String getResendAlreadyVerifiedMessage() {
+        return messageSource.getMessage("auth.resend.alreadyVerified", null, resolveLocale());
+    }
 }
