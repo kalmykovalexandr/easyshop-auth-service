@@ -105,7 +105,7 @@ public class EmailService {
     }
     
     /**
-     * Sends resend verification message to user
+     * Sends verification message to user (for resend)
      * @param user User to send verification to
      * @param token Verification token
      * @param locale User's locale
@@ -113,14 +113,14 @@ public class EmailService {
      */
     public boolean sendResendVerificationEmail(User user, String token, Locale locale) {
         if (!isEmailConfigured()) {
-            log.warn("Email not configured, skipping resend verification email for user: {}", user.getEmail());
+            log.warn("Email not configured, skipping verification email for user: {}", user.getEmail());
             return false;
         }
         
         try {
             String verificationUrl = verificationBaseUrl + "?token=" + token;
-            String subject = messageSource.getMessage("email.resend.subject", null, locale);
-            String htmlContent = buildResendVerificationEmailHtml(user, verificationUrl, locale);
+            String subject = messageSource.getMessage("email.verification.subject", null, locale);
+            String htmlContent = buildVerificationEmailHtml(user, verificationUrl, locale);
             
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
@@ -132,11 +132,11 @@ public class EmailService {
             
             mailSender.send(message);
             
-            log.info("Resend verification email sent successfully to: {}", user.getEmail());
+            log.info("Verification email sent successfully to: {}", user.getEmail());
             return true;
             
         } catch (MailException | MessagingException | UnsupportedEncodingException e) {
-            log.error("Failed to send resend verification email to: {}", user.getEmail(), e);
+            log.error("Failed to send verification email to: {}", user.getEmail(), e);
             return false;
         }
     }
@@ -173,14 +173,14 @@ public class EmailService {
         EmailVerificationToken tokenEntity = new EmailVerificationToken(token, user, now.plus(tokenTtl));
         tokenRepository.save(tokenEntity);
 
-        // Send resend verification email
+        // Send verification email
         boolean emailSent = sendResendVerificationEmail(user, token, locale);
         
         if (emailSent) {
-            log.info("Resend verification email sent successfully to: {} (locale: {})", 
+            log.info("Verification email sent successfully to: {} (locale: {})", 
                     user.getEmail(), locale != null ? locale : Locale.ENGLISH);
         } else {
-            log.warn("Failed to send resend verification email to: {} (locale: {}). Token: {}?token={}", 
+            log.warn("Failed to send verification email to: {} (locale: {}). Token: {}?token={}", 
                     user.getEmail(), locale != null ? locale : Locale.ENGLISH, verificationBaseUrl, token);
         }
     }
@@ -250,7 +250,7 @@ public class EmailService {
         try {
             return Long.parseLong(trimmed);
         } catch (NumberFormatException ex) {
-            log.warn("Invalid resend cooldown value '{}'. Falling back to {} seconds.", value, defaultValue);
+            log.warn("Invalid cooldown value '{}'. Falling back to {} seconds.", value, defaultValue);
             return defaultValue;
         }
     }
@@ -267,11 +267,4 @@ public class EmailService {
         return templateEngine.process("email/verification", context);
     }
     
-    private String buildResendVerificationEmailHtml(User user, String verificationUrl, Locale locale) {
-        Context context = new Context(locale);
-        context.setVariable("userName", user.getEmail());
-        context.setVariable("verificationUrl", verificationUrl);
-        
-        return templateEngine.process("email/resend-verification", context);
-    }
 }
