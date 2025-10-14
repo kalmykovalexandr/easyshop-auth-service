@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title th:text="#{email.resend.subject}">Resend email verification - EasyShop</title>
+    <title th:text="#{email.resend.subject}">Resend verification - EasyShop</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
@@ -21,33 +21,43 @@
             overflow: hidden;
         }
         .header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background-color: #22c55e;
             color: white;
-            padding: 40px 30px;
+            padding: 30px;
             text-align: center;
         }
         .header h1 {
             margin: 0;
-            font-size: 28px;
+            font-size: 24px;
             font-weight: 600;
         }
         .content {
             padding: 40px 30px;
+            text-align: center;
+        }
+        .illustration {
+            margin: 20px 0 30px 0;
+            text-align: center;
+        }
+        .illustration svg {
+            width: 80px;
+            height: 80px;
         }
         .content h2 {
-            color: #2d3748;
+            color: #1f2937;
             font-size: 24px;
             margin: 0 0 20px 0;
             font-weight: 600;
         }
         .content p {
-            color: #4a5568;
+            color: #6b7280;
             font-size: 16px;
-            margin: 0 0 20px 0;
+            margin: 0 0 30px 0;
+            line-height: 1.5;
         }
         .button {
             display: inline-block;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background-color: #22c55e;
             color: white;
             text-decoration: none;
             padding: 16px 32px;
@@ -55,95 +65,50 @@
             font-weight: 600;
             font-size: 16px;
             text-align: center;
-            margin: 30px 0;
-            transition: transform 0.2s ease;
+            margin: 20px 0;
+            transition: background-color 0.2s ease;
         }
         .button:hover {
-            transform: translateY(-2px);
-        }
-        .note {
-            background-color: #f7fafc;
-            border-left: 4px solid #667eea;
-            padding: 20px;
-            margin: 30px 0;
-            border-radius: 0 8px 8px 0;
-        }
-        .note p {
-            margin: 0;
-            color: #4a5568;
-            font-size: 14px;
+            background-color: #16a34a;
         }
         .footer {
             background-color: #f8f9fa;
             padding: 30px;
             text-align: center;
-            border-top: 1px solid #e2e8f0;
+            border-top: 1px solid #e5e7eb;
         }
         .footer p {
-            color: #718096;
+            color: #6b7280;
             font-size: 14px;
             margin: 0;
-        }
-        .link {
-            color: #667eea;
-            text-decoration: none;
-        }
-        .link:hover {
-            text-decoration: underline;
-        }
-        .resend-notice {
-            background-color: #fff3cd;
-            border: 1px solid #ffeaa7;
-            border-radius: 8px;
-            padding: 20px;
-            margin: 20px 0;
-        }
-        .resend-notice p {
-            margin: 0;
-            color: #856404;
-            font-size: 14px;
         }
     </style>
 </head>
 <body>
     <div class="email-container">
         <div class="header">
-            <h1 th:text="#{email.resend.title}">Resend Email Verification</h1>
+            <h1 th:text="#{email.resend.title}">EasyShop</h1>
         </div>
         
         <div class="content">
-            <h2 th:text="#{email.resend.header}">New verification email</h2>
+            <div class="illustration">
+                <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="20" y="30" width="60" height="40" rx="4" fill="#22c55e" opacity="0.1"/>
+                    <rect x="25" y="35" width="50" height="30" rx="2" fill="#22c55e" opacity="0.2"/>
+                    <path d="M25 45L40 55L75 35" stroke="#22c55e" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                    <circle cx="70" cy="25" r="8" fill="#22c55e" opacity="0.8"/>
+                    <path d="M70 20L73 23L77 19" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </div>
+            
+            <h2 th:text="#{email.resend.header}">Please confirm your email address</h2>
             
             <p th:text="#{email.resend.message}">
-                You requested a new verification email for your EasyShop account.
+                Thanks for signing up to EasyShop. We're happy to have you.
+                Please take a second to make sure we have your correct email address.
             </p>
             
-            <div class="resend-notice">
-                <p th:text="#{email.resend.notice}">
-                    This email was sent again at your request. If you didn't request a resend, you can safely ignore this email.
-                </p>
-            </div>
-            
-            <p th:text="#{email.resend.button} + ':'">
-                Click the button below to confirm your email:
-            </p>
-            
-            <div style="text-align: center;">
-                <a href="#" th:href="${verificationUrl}" class="button" th:text="#{email.resend.button}">Confirm Email</a>
-            </div>
-            
-            <div class="note">
-                <p th:text="#{email.resend.fallback}">
-                    If the button doesn't work, copy and paste this link into your browser:
-                </p>
-                <p style="word-break: break-all; font-family: monospace; background-color: #e2e8f0; padding: 10px; border-radius: 4px; margin-top: 10px;">
-                    <a th:href="${verificationUrl}" th:text="${verificationUrl}" class="link"></a>
-                </p>
-            </div>
-            
-            <p th:text="#{email.resend.note}">
-                This link is valid for 24 hours. After confirmation, you'll be able to sign in to your account.
-            </p>
+            <a href="#" th:href="${verificationUrl}" class="button" th:text="#{email.resend.button}">Confirm your email address</a>
         </div>
         
         <div class="footer">
