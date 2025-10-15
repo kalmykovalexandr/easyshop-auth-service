@@ -5,5 +5,6 @@ public enum EmailVerificationStatus {
     ALREADY_VERIFIED,
     EXPIRED,
     NOT_FOUND,
-    INVALID
+    INVALID,
+    TOO_MANY_ATTEMPTS
 }

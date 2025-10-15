@@ -22,6 +22,9 @@
   let resendCooldownDetail = ''
   const successHomeLink = successContainer?.querySelector('[data-action="go-home"]')
   const registerNote = registerSection?.querySelector('.auth-note')
+  const otpModal = registerSection?.querySelector('[data-otp-modal]')
+  const otpInput = registerSection?.querySelector('[data-otp-input]')
+  const otpFeedback = registerSection?.querySelector('[data-otp-feedback]')
 
   const passwordToggleButtons = Array.from(root.querySelectorAll('[data-toggle-password]'))
 
@@ -623,8 +626,16 @@
       registerForm.setAttribute('aria-hidden', 'true')
       registerForm.style.display = 'none'
     }
-    successContainer.hidden = false
-    successContainer.setAttribute('aria-hidden', 'false')
+    // вместо финальной модалки показываем OTP ввод
+    if (otpModal) {
+      otpModal.hidden = false
+      otpModal.setAttribute('aria-hidden', 'false')
+      otpFeedback && (otpFeedback.textContent = '')
+      window.requestAnimationFrame(() => otpInput?.focus())
+    } else {
+      successContainer.hidden = false
+      successContainer.setAttribute('aria-hidden', 'false')
+    }
     syncCardHeight()
     window.requestAnimationFrame(() => {
       if (!isResendDisabled()) {
@@ -634,6 +645,73 @@
       }
     })
   }
+
+  async function submitOtp() {
+    if (!otpInput) return
+    const raw = otpInput.value.trim()
+    if (!/^\d{5,6}$/.test(raw)) {
+      if (otpFeedback) {
+        otpFeedback.textContent = registerForm?.dataset?.otpInvalid || 'Enter a valid 6-digit code.'
+        otpFeedback.classList.add('auth-success__feedback--error')
+      }
+      return
+    }
+    try {
+      const resp = await fetch('/api/auth/verify-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ email: lastSubmittedEmail, code: raw })
+      })
+      if (!resp.ok) {
+        const payload = await resp.json().catch(() => null)
+        const status = payload && payload.status
+
+        // Handle TOO_MANY_ATTEMPTS: delete code, show message with resend option
+        if (status === 'TOO_MANY_ATTEMPTS') {
+          const msg = (payload && payload.detail) || 'Too many incorrect attempts. Please request a new code.'
+          if (otpFeedback) {
+            otpFeedback.textContent = msg
+            otpFeedback.classList.add('auth-success__feedback--error')
+          }
+          // Clear the input so user knows code is invalidated
+          if (otpInput) {
+            otpInput.value = ''
+          }
+          return
+        }
+
+        // Handle other errors
+        const msg = (payload && (payload.detail || payload.message)) || 'Invalid code.'
+        if (otpFeedback) {
+          otpFeedback.textContent = msg
+          otpFeedback.classList.add('auth-success__feedback--error')
+        }
+        return
+      }
+      // успех: показать финальную модалку с одной кнопкой "Go to store"
+      if (otpModal) {
+        otpModal.hidden = true
+        otpModal.setAttribute('aria-hidden', 'true')
+      }
+      if (successContainer) {
+        successContainer.hidden = false
+        successContainer.setAttribute('aria-hidden', 'false')
+        const msgEl = successContainer.querySelector('[data-success-message]')
+        if (msgEl) msgEl.textContent = registerForm?.dataset?.successOtp || (registerForm?.dataset?.successOtpText || '') || 'Registration confirmed successfully.'
+        const actions = successContainer.querySelector('.auth-success__actions')
+        const signInBtn = actions && actions.querySelector('[data-action="show-signin"]')
+        if (signInBtn) signInBtn.remove()
+      }
+      syncCardHeight()
+    } catch (e) {
+      if (otpFeedback) {
+        otpFeedback.textContent = 'Network error. Try again.'
+        otpFeedback.classList.add('auth-success__feedback--error')
+      }
+    }
+  }
+
+  registerSection?.querySelector('[data-action="submit-otp"]').addEventListener('click', submitOtp)
 
   function showRegisterForm() {
     setRegisterState('form')

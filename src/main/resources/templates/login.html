@@ -85,7 +85,7 @@
                            data-error-empty=#{login.register.error.empty},
                            data-error-email=#{login.register.error.email},
                            data-error-password=#{login.register.error.password},
-                           data-resend-url=@{/api/auth/resend-verification},
+                           data-resend-url=@{/api/auth/resend-verification-code},
                            data-home-url=@{/},
                            data-resend-success=#{login.register.modal.resendSuccess},
                            data-resend-error=#{login.register.modal.resendError},
@@ -125,7 +125,38 @@
                 <div class="auth-feedback" data-feedback></div>
             </form>
 
-            <div class="auth-success" data-register-success hidden aria-hidden="true">
+            <!-- Email verification success modal -->
+            <div class="auth-success" data-register-success th:if="${showEmailVerified == true}" th:classappend="${(showEmailVerified == true) ? '' : 'hidden'}" th:attr="aria-hidden=${(showEmailVerified == true) ? 'false' : 'true'}">
+                <div class="auth-success__status">
+                    <h2 class="auth-success__title" th:text="#{auth.email.verified.title}">Email Verified!</h2>
+                    <p class="auth-success__message" th:text="#{auth.email.verified.message}">Your email has been successfully verified. You can now sign in to your EasyShop account.</p>
+                </div>
+                <div class="auth-success__actions">
+                    <button type="button" class="auth-button" data-action="show-signin" th:text="#{auth.email.verified.button.signin}">Sign In</button>
+                    <a class="auth-button auth-button--secondary" data-action="go-home" th:href="@{/}" th:text="#{auth.email.verified.button.store}">Go to Store</a>
+                </div>
+            </div>
+
+            <!-- OTP verification modal -->
+            <div class="auth-success" data-otp-modal hidden aria-hidden="true">
+                <div class="auth-success__status">
+                    <h2 class="auth-success__title" th:text="#{auth.email.verified.title}">Email Verified!</h2>
+                    <p class="auth-success__message" th:text="#{login.register.modal.messageOtp}">Enter the 6-digit code we sent to your e‑mail.</p>
+                    <label class="auth-field">
+                        <input class="auth-field__input" type="text" inputmode="numeric" pattern="[0-9]{5,6}" maxlength="6" placeholder="123456" data-otp-input>
+                    </label>
+                </div>
+                <div class="auth-success__feedback" role="status" aria-live="polite" data-otp-feedback></div>
+                <div class="auth-success__actions">
+                    <button type="button" class="auth-button" data-action="submit-otp" th:text="#{login.register.modal.confirm}">Confirm</button>
+                    <a class="auth-button auth-button--secondary" data-action="resend-verification" href="#" th:text="#{login.register.modal.resend}">Send again</a>
+                </div>
+            </div>
+
+            <!-- removed link-flow error modal -->
+
+            <!-- Regular registration success modal (hidden by default) -->
+            <div class="auth-success" data-register-success th:unless="${(showEmailVerified == true) or (showVerificationError == true)}" hidden aria-hidden="true">
                 <div class="auth-success__status">
                     <p class="auth-success__message" data-success-message></p>
                 </div>

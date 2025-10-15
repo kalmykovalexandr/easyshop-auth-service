@@ -365,6 +365,14 @@ input[type="password"]::-ms-clear {
   padding: 0;
 }
 
+.auth-success__title {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #22c55e;
+  text-align: center;
+}
+
 
 .auth-success__message {
   margin: 0;
@@ -379,22 +387,7 @@ input[type="password"]::-ms-clear {
   line-height: 1.5;
 }
 
-.auth-success__link {
-  color: #2563eb;
-  font-weight: 600;
-  text-decoration: none;
-}
-
-.auth-success__link:hover {
-  text-decoration: underline;
-}
-
-.auth-success__link--disabled {
-  color: #9ca3af;
-  pointer-events: none;
-  cursor: default;
-  text-decoration: none;
-}
+/* removed: link-flow styles no longer used */
 
 
 .auth-success__feedback {

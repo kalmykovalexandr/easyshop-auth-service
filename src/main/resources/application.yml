@@ -38,9 +38,16 @@ spring:
 # EasyShop specific configuration
 easyshop:
   mail:
-    from-email: ${EASYSHOP_MAIL_FROM:}
-    from-name: ${EASYSHOP_MAIL_FROM_NAME:EasyShop}
+    from-email: ${MAIL_FROM_EMAIL:noreply@easyshop.com}
+    from-name: ${MAIL_FROM_NAME:EasyShop}
   auth:
-    verification-base-url: ${EASYSHOP_VERIFICATION_URL:http://localhost:9001/api/auth/verify}
-    verification-ttl-hours: ${EASYSHOP_VERIFICATION_TTL:24}
-    verification-resend-cooldown-seconds: ${EASYSHOP_VERIFICATION_COOLDOWN:60}
+    # Email verification code settings (Production-grade defaults)
+    verification-code-length: ${VERIFICATION_CODE_LENGTH:6}
+    verification-ttl-minutes: ${VERIFICATION_TTL_MINUTES:10}
+    verification-max-attempts: ${VERIFICATION_MAX_ATTEMPTS:3}
+    verification-resend-cooldown-seconds: ${VERIFICATION_RESEND_COOLDOWN_SECONDS:120}
+
+    # IP-based rate limiting
+    verification-ip-rate-limit-enabled: ${VERIFICATION_IP_RATE_LIMIT_ENABLED:true}
+    verification-ip-max-attempts: ${VERIFICATION_IP_MAX_ATTEMPTS:10}
+    verification-ip-window-minutes: ${VERIFICATION_IP_WINDOW_MINUTES:60}

@@ -1,14 +1,7 @@
 package com.easyshop.auth.web;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-
-import com.easyshop.auth.model.EmailVerificationStatus;
 import com.easyshop.auth.model.RegistrationResult;
+import com.easyshop.auth.security.VerificationRateLimiter;
 import com.easyshop.auth.service.AuthService;
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.BeforeEach;
@@ -21,18 +14,28 @@ import org.springframework.http.converter.json.MappingJackson2HttpMessageConvert
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
 @ExtendWith(MockitoExtension.class)
 class AuthControllerTest {
 
     @Mock
     private AuthService authService;
 
+    @Mock
+    private VerificationRateLimiter rateLimiter;
+
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders
-                .standaloneSetup(new AuthController(authService))
+                .standaloneSetup(new AuthController(authService, rateLimiter))
                 .setMessageConverters(new MappingJackson2HttpMessageConverter())
                 .build();
     }
@@ -75,31 +78,5 @@ class AuthControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.ok").value(false))
                 .andExpect(jsonPath("$.detail").value(Matchers.containsString("Password requirements")));
-    }
-
-    @Test
-    void verifyEmailSuccess() throws Exception {
-        when(authService.verifyEmail("token")).thenReturn(EmailVerificationStatus.VERIFIED);
-        when(authService.getVerificationMessage(EmailVerificationStatus.VERIFIED))
-                .thenReturn("Email verified. You can sign in now.");
-
-        mockMvc.perform(get("/api/auth/verify").param("token", "token"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.ok").value(true))
-                .andExpect(jsonPath("$.status").value("VERIFIED"))
-                .andExpect(jsonPath("$.message").value("Email verified. You can sign in now."));
-    }
-
-    @Test
-    void verifyEmailExpired() throws Exception {
-        when(authService.verifyEmail("token")).thenReturn(EmailVerificationStatus.EXPIRED);
-        when(authService.getVerificationMessage(EmailVerificationStatus.EXPIRED))
-                .thenReturn("Verification link has expired. Request a new one.");
-
-        mockMvc.perform(get("/api/auth/verify").param("token", "token"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.ok").value(false))
-                .andExpect(jsonPath("$.status").value("EXPIRED"))
-                .andExpect(jsonPath("$.message").value("Verification link has expired. Request a new one."));
     }
 }

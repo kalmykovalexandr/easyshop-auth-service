@@ -1,15 +1,15 @@
 package com.easyshop.auth.service;
 
-import com.easyshop.auth.entity.EmailVerificationToken;
+import com.easyshop.auth.entity.EmailVerificationCode;
 import com.easyshop.auth.entity.User;
-import com.easyshop.auth.model.EmailVerificationStatus;
-import com.easyshop.auth.repository.EmailVerificationTokenRepository;
+import com.easyshop.auth.repository.EmailVerificationCodeRepository;
 import com.easyshop.auth.repository.UserRepository;
+import com.easyshop.auth.security.VerificationCodeGenerator;
+import com.easyshop.auth.security.VerificationCodeHasher;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Locale;
 import java.util.Optional;
-import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -27,218 +27,191 @@ import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import java.io.UnsupportedEncodingException;
 
+/**
+ * Service for managing email verification codes during user registration.
+ * Handles code generation, hashing, storage, and email delivery.
+ */
 @Service
 public class EmailService {
-    
+
     private static final Logger log = LoggerFactory.getLogger(EmailService.class);
-    private static final Duration DEFAULT_EXPIRATION = Duration.ofHours(24);
-    
+    private static final Duration DEFAULT_CODE_TTL = Duration.ofMinutes(15);
+
     private final JavaMailSender mailSender;
     private final TemplateEngine templateEngine;
     private final MessageSource messageSource;
-    private final EmailVerificationTokenRepository tokenRepository;
+    private final EmailVerificationCodeRepository verificationCodeRepository;
     private final UserRepository userRepository;
+    private final VerificationCodeGenerator codeGenerator;
+    private final VerificationCodeHasher codeHasher;
     private final String fromEmail;
     private final String fromName;
-    private final String verificationBaseUrl;
-    private final Duration tokenTtl;
+    private final Duration codeTtl;
     private final Duration resendCooldown;
-    
+
     public EmailService(JavaMailSender mailSender,
                        TemplateEngine templateEngine,
                        MessageSource messageSource,
-                       EmailVerificationTokenRepository tokenRepository,
+                       EmailVerificationCodeRepository verificationCodeRepository,
                        UserRepository userRepository,
+                       VerificationCodeGenerator codeGenerator,
+                       VerificationCodeHasher codeHasher,
                        @Value("${easyshop.mail.from-email:}") String fromEmail,
                        @Value("${easyshop.mail.from-name:EasyShop}") String fromName,
-                       @Value("${easyshop.auth.verification-base-url:http://localhost:9001/api/auth/verify}") String verificationBaseUrl,
-                       @Value("${easyshop.auth.verification-ttl-hours:24}") long tokenTtlHours,
+                       @Value("${easyshop.auth.verification-ttl-minutes:15}") long codeTtlMinutes,
                        @Value("${easyshop.auth.verification-resend-cooldown-seconds:60}") String resendCooldownSecondsValue) {
         this.mailSender = mailSender;
         this.templateEngine = templateEngine;
         this.messageSource = messageSource;
-        this.tokenRepository = tokenRepository;
+        this.verificationCodeRepository = verificationCodeRepository;
         this.userRepository = userRepository;
+        this.codeGenerator = codeGenerator;
+        this.codeHasher = codeHasher;
         this.fromEmail = fromEmail;
         this.fromName = fromName;
-        this.verificationBaseUrl = verificationBaseUrl;
-        this.tokenTtl = tokenTtlHours > 0 ? Duration.ofHours(tokenTtlHours) : DEFAULT_EXPIRATION;
+        this.codeTtl = codeTtlMinutes > 0 ? Duration.ofMinutes(codeTtlMinutes) : DEFAULT_CODE_TTL;
         long resolvedCooldownSeconds = parseLongOrDefault(resendCooldownSecondsValue, 60L);
         this.resendCooldown = resolvedCooldownSeconds > 0 ? Duration.ofSeconds(resolvedCooldownSeconds) : Duration.ofSeconds(60);
-    }
-    
-    /**
-     * Sends email verification message to user
-     * @param user User to send verification to
-     * @param token Verification token
-     * @param locale User's locale
-     * @return true if email was sent successfully, false otherwise
-     */
-    public boolean sendVerificationEmail(User user, String token, Locale locale) {
-        if (!isEmailConfigured()) {
-            log.warn("Email not configured, skipping verification email for user: {}", user.getEmail());
-            return false;
-        }
-        
-        try {
-            String verificationUrl = verificationBaseUrl + "?token=" + token;
-            String subject = messageSource.getMessage("email.verification.subject", null, locale);
-            String htmlContent = buildVerificationEmailHtml(user, verificationUrl, locale);
-            
-            MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
-            
-            helper.setFrom(fromEmail, fromName);
-            helper.setTo(user.getEmail());
-            helper.setSubject(subject);
-            helper.setText(htmlContent, true);
-            
-            mailSender.send(message);
-            
-            log.info("Verification email sent successfully to: {}", user.getEmail());
-            return true;
-            
-        } catch (MailException | MessagingException | UnsupportedEncodingException e) {
-            log.error("Failed to send verification email to: {}", user.getEmail(), e);
-            return false;
-        }
-    }
-    
-    /**
-     * Sends verification message to user (for resend)
-     * @param user User to send verification to
-     * @param token Verification token
-     * @param locale User's locale
-     * @return true if email was sent successfully, false otherwise
-     */
-    public boolean sendResendVerificationEmail(User user, String token, Locale locale) {
-        if (!isEmailConfigured()) {
-            log.warn("Email not configured, skipping verification email for user: {}", user.getEmail());
-            return false;
-        }
-        
-        try {
-            String verificationUrl = verificationBaseUrl + "?token=" + token;
-            String subject = messageSource.getMessage("email.verification.subject", null, locale);
-            String htmlContent = buildVerificationEmailHtml(user, verificationUrl, locale);
-            
-            MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
-            
-            helper.setFrom(fromEmail, fromName);
-            helper.setTo(user.getEmail());
-            helper.setSubject(subject);
-            helper.setText(htmlContent, true);
-            
-            mailSender.send(message);
-            
-            log.info("Verification email sent successfully to: {}", user.getEmail());
-            return true;
-            
-        } catch (MailException | MessagingException | UnsupportedEncodingException e) {
-            log.error("Failed to send verification email to: {}", user.getEmail(), e);
-            return false;
-        }
-    }
-    
-    // =============================================================================
-    // Token Management Methods (from EmailVerificationService)
-    // =============================================================================
-    
-    @Transactional
-    public void createAndSendToken(User user, Locale locale) {
-        tokenRepository.deleteByUser(user);
-        LocalDateTime now = LocalDateTime.now();
-        String token = UUID.randomUUID().toString();
-        EmailVerificationToken tokenEntity = new EmailVerificationToken(token, user, now.plus(tokenTtl));
-        tokenRepository.save(tokenEntity);
 
-        // Send verification email
-        boolean emailSent = sendVerificationEmail(user, token, locale);
-        
+        log.info("EmailService initialized: codeTtl={} min, resendCooldown={} sec",
+                codeTtl.toMinutes(), resendCooldown.getSeconds());
+    }
+
+    // =============================================================================
+    // Public API Methods
+    // =============================================================================
+
+    /**
+     * Creates a verification code and sends it via email to the user.
+     * Deletes any existing codes for the user before creating a new one.
+     *
+     * @param user User to send verification code to
+     * @param locale User's locale for email content
+     * @param plainCode the plain text code to send (will be hashed before storage)
+     */
+    @Transactional
+    public void createAndSendVerificationCode(User user, Locale locale, String plainCode) {
+        // Delete existing codes for this user
+        verificationCodeRepository.deleteByUser(user);
+
+        // Hash the code before storing
+        String codeHash = codeHasher.hashCode(plainCode);
+
+        // Create and save new verification code
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime expiresAt = now.plus(codeTtl);
+        EmailVerificationCode codeEntity = new EmailVerificationCode(user, codeHash, expiresAt);
+        verificationCodeRepository.save(codeEntity);
+
+        // Send verification email with plain code
+        boolean emailSent = sendVerificationEmail(user, plainCode, locale);
+
         if (emailSent) {
-            log.info("Email verification sent successfully to: {} (locale: {})", 
+            log.info("Email verification code sent successfully to: {} (locale: {})",
                     user.getEmail(), locale != null ? locale : Locale.ENGLISH);
         } else {
-            log.warn("Failed to send verification email to: {} (locale: {}). Token: {}?token={}", 
-                    user.getEmail(), locale != null ? locale : Locale.ENGLISH, verificationBaseUrl, token);
-        }
-    }
-    
-    @Transactional
-    public void createAndSendResendToken(User user, Locale locale) {
-        tokenRepository.deleteByUser(user);
-        LocalDateTime now = LocalDateTime.now();
-        String token = UUID.randomUUID().toString();
-        EmailVerificationToken tokenEntity = new EmailVerificationToken(token, user, now.plus(tokenTtl));
-        tokenRepository.save(tokenEntity);
-
-        // Send verification email
-        boolean emailSent = sendResendVerificationEmail(user, token, locale);
-        
-        if (emailSent) {
-            log.info("Verification email sent successfully to: {} (locale: {})", 
+            log.warn("Failed to send verification email to: {} (locale: {})",
                     user.getEmail(), locale != null ? locale : Locale.ENGLISH);
-        } else {
-            log.warn("Failed to send verification email to: {} (locale: {}). Token: {}?token={}", 
-                    user.getEmail(), locale != null ? locale : Locale.ENGLISH, verificationBaseUrl, token);
         }
     }
-    
+
+    /**
+     * Finds the latest verification code for a user.
+     *
+     * @param user the user
+     * @return Optional containing the verification code if found
+     */
     @Transactional(readOnly = true)
-    public Optional<EmailVerificationToken> findLatestToken(User user) {
-        return tokenRepository.findFirstByUserOrderByCreatedAtDesc(user);
+    public Optional<EmailVerificationCode> findLatestVerificationCode(User user) {
+        return verificationCodeRepository.findFirstByUserOrderByCreatedAtDesc(user);
     }
-    
+
+    /**
+     * Gets the configured resend cooldown duration.
+     *
+     * @return resend cooldown
+     */
     public Duration getResendCooldown() {
         return resendCooldown;
     }
-    
+
+    /**
+     * Deletes all verification codes for a user.
+     *
+     * @param user the user
+     */
     @Transactional
-    public EmailVerificationStatus verify(String token) {
-        if (token == null || token.isBlank()) {
-            return EmailVerificationStatus.INVALID;
-        }
-
-        return tokenRepository.findByToken(token)
-                .map(this::applyVerification)
-                .orElse(EmailVerificationStatus.NOT_FOUND);
+    public void deleteVerificationCodesForUser(User user) {
+        verificationCodeRepository.deleteByUser(user);
     }
-    
-    private EmailVerificationStatus applyVerification(EmailVerificationToken token) {
-        LocalDateTime now = LocalDateTime.now();
-        if (token.isUsed()) {
-            return EmailVerificationStatus.ALREADY_VERIFIED;
-        }
-        if (token.isExpired(now)) {
-            tokenRepository.delete(token);
-            return EmailVerificationStatus.EXPIRED;
-        }
 
-        User user = token.getUser();
-        if (Boolean.TRUE.equals(user.getEnabled())) {
-            token.setUsedAt(now);
-            tokenRepository.save(token);
-            return EmailVerificationStatus.ALREADY_VERIFIED;
-        }
-
-        user.setEnabled(true);
-        userRepository.save(user);
-        token.setUsedAt(now);
-        tokenRepository.save(token);
-        tokenRepository.deleteByUser(user);
-        return EmailVerificationStatus.VERIFIED;
-    }
-    
+    /**
+     * Deletes all expired verification codes from the database.
+     * Should be called periodically by a scheduled task.
+     */
     @Transactional
-    public void purgeExpiredTokens() {
-        tokenRepository.deleteByExpiresAtBefore(LocalDateTime.now());
+    public void purgeExpiredVerificationCodes() {
+        verificationCodeRepository.deleteByExpiresAtBefore(LocalDateTime.now());
     }
-    
+
+    // =============================================================================
+    // Email Sending Methods
+    // =============================================================================
+
+    /**
+     * Sends email verification message to user with the plain code.
+     *
+     * @param user User to send verification to
+     * @param plainCode Plain text verification code to include in email
+     * @param locale User's locale
+     * @return true if email was sent successfully, false otherwise
+     */
+    private boolean sendVerificationEmail(User user, String plainCode, Locale locale) {
+        if (!isEmailConfigured()) {
+            log.warn("Email not configured, skipping verification email for user: {}", user.getEmail());
+            return false;
+        }
+
+        try {
+            String subject = messageSource.getMessage("email.verification.subject", null, locale);
+            String htmlContent = buildVerificationEmailHtml(plainCode, locale);
+
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setFrom(fromEmail, fromName);
+            helper.setTo(user.getEmail());
+            helper.setSubject(subject);
+            helper.setText(htmlContent, true);
+
+            mailSender.send(message);
+
+            log.info("Verification email sent successfully to: {}", user.getEmail());
+            return true;
+
+        } catch (MailException | MessagingException | UnsupportedEncodingException e) {
+            log.error("Failed to send verification email to: {}", user.getEmail(), e);
+            return false;
+        }
+    }
+
+    /**
+     * Builds the HTML content for verification email using Thymeleaf template.
+     *
+     * @param plainCode the plain text code to display
+     * @param locale user's locale
+     * @return HTML email content
+     */
+    private String buildVerificationEmailHtml(String plainCode, Locale locale) {
+        Context context = new Context(locale);
+        context.setVariable("verificationCode", plainCode);
+        return templateEngine.process("email/otp-verification", context);
+    }
+
     // =============================================================================
     // Helper Methods
     // =============================================================================
-    
+
     private long parseLongOrDefault(String value, long defaultValue) {
         if (value == null) {
             return defaultValue;
@@ -254,17 +227,8 @@ public class EmailService {
             return defaultValue;
         }
     }
-    
+
     private boolean isEmailConfigured() {
         return StringUtils.hasText(fromEmail);
     }
-    
-    private String buildVerificationEmailHtml(User user, String verificationUrl, Locale locale) {
-        Context context = new Context(locale);
-        context.setVariable("userName", user.getEmail());
-        context.setVariable("verificationUrl", verificationUrl);
-        
-        return templateEngine.process("email/verification", context);
-    }
-    
 }
