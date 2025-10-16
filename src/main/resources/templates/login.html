@@ -62,8 +62,104 @@
                 </button>
             </div>
 
-            <a href="#" class="auth-link" th:text="#{login.forgot}">Forgot login?</a>
+            <a href="#" class="auth-link" data-action="show-forgot-password" th:text="#{login.forgot}">Forgot login?</a>
             <p class="auth-note" th:text="#{login.notice}">Secure login. Google Terms & Privacy apply.</p>
+
+            <!-- Forgot Password Modal: Step 1 - Email Input -->
+            <div class="auth-success" data-forgot-password-modal hidden aria-hidden="true">
+                <div class="auth-success__status">
+                    <h2 class="auth-success__title" th:text="#{password.forgot.title}">Forgot Password?</h2>
+                    <p class="auth-success__message" th:text="#{password.forgot.description}">Enter your email address and we'll send you a verification code.</p>
+                    <label class="auth-field">
+                        <input class="auth-field__input" type="email" name="reset-email" autocomplete="email" placeholder="your@email.com" data-reset-email-input>
+                    </label>
+                </div>
+                <div class="auth-success__feedback" role="status" aria-live="polite" data-forgot-feedback></div>
+                <div class="auth-success__actions">
+                    <button type="button" class="auth-button" data-action="send-reset-code" th:text="#{password.forgot.submit}">Send Code</button>
+                    <button type="button" class="auth-button auth-button--secondary" data-action="cancel-forgot" th:text="#{password.forgot.back}">Back to sign in</button>
+                </div>
+                <footer class="auth-footer">
+                    <p class="auth-footer__text" th:text="#{login.footer.copyright(${#temporals.year(#temporals.createNow())})}">© 2025 EasyShop. All rights reserved.</p>
+                </footer>
+            </div>
+
+            <!-- Password Reset OTP Modal: Step 2 - Verify Code -->
+            <div class="auth-success" data-reset-otp-modal hidden aria-hidden="true">
+                <div class="auth-success__status">
+                    <h2 class="auth-success__title" th:text="#{password.reset.otp.title}">Enter Code</h2>
+                    <p class="auth-success__message" th:text="#{password.reset.otp.message}">Enter the 8-digit code we sent to your email.</p>
+                    <label class="auth-field">
+                        <input class="auth-field__input" type="text" inputmode="numeric" pattern="[0-9]{8}" maxlength="8" placeholder="12345678" data-reset-otp-input>
+                    </label>
+                </div>
+                <div class="auth-success__feedback" role="status" aria-live="polite" data-reset-otp-feedback></div>
+                <div class="auth-success__actions">
+                    <button type="button" class="auth-button" data-action="verify-reset-code" th:text="#{password.reset.otp.verify}">Verify Code</button>
+                    <button type="button" class="auth-button auth-button--secondary" data-action="back-to-forgot" th:text="#{password.forgot.back}">Back</button>
+                </div>
+                <footer class="auth-footer">
+                    <p class="auth-footer__text" th:text="#{login.footer.copyright(${#temporals.year(#temporals.createNow())})}">© 2025 EasyShop. All rights reserved.</p>
+                </footer>
+            </div>
+
+            <!-- Password Reset Form: Step 3 - New Password -->
+            <div class="auth-success" data-reset-password-modal hidden aria-hidden="true">
+                <div class="auth-success__status">
+                    <h2 class="auth-success__title" th:text="#{password.reset.form.title}">New Password</h2>
+                    <p class="auth-success__message" th:text="#{password.reset.form.description}">Enter your new password.</p>
+                    <label class="auth-field auth-field--with-toggle">
+                        <div class="auth-field__control">
+                            <input class="auth-field__input" type="password" name="new-password" autocomplete="new-password" placeholder="New password" data-new-password-input>
+                            <button type="button" class="auth-field__toggle" data-toggle-password
+                                    th:attr="data-label-show=#{login.form.password.show},
+                                             data-label-hide=#{login.form.password.hide},
+                                             aria-label=#{login.form.password.show}">
+                                <span class="auth-field__toggle-icon" aria-hidden="true"></span>
+                                <span class="sr-only" th:text="#{login.form.password.show}">Show password</span>
+                            </button>
+                        </div>
+                    </label>
+                    <label class="auth-field auth-field--with-toggle">
+                        <div class="auth-field__control">
+                            <input class="auth-field__input" type="password" name="confirm-new-password" autocomplete="new-password" placeholder="Confirm password" data-confirm-password-input>
+                            <button type="button" class="auth-field__toggle" data-toggle-password
+                                    th:attr="data-label-show=#{login.form.password.show},
+                                             data-label-hide=#{login.form.password.hide},
+                                             aria-label=#{login.form.password.show}">
+                                <span class="auth-field__toggle-icon" aria-hidden="true"></span>
+                                <span class="sr-only" th:text="#{login.form.password.show}">Show password</span>
+                            </button>
+                        </div>
+                    </label>
+                    <p class="auth-hint" th:text="#{login.form.requirements}">At least 8 characters...</p>
+                </div>
+                <div class="auth-success__feedback" role="status" aria-live="polite" data-reset-password-feedback></div>
+                <div class="auth-success__actions">
+                    <button type="button" class="auth-button" data-action="complete-reset" th:text="#{password.reset.submit}">Reset Password</button>
+                </div>
+                <footer class="auth-footer">
+                    <p class="auth-footer__text" th:text="#{login.footer.copyright(${#temporals.year(#temporals.createNow())})}">© 2025 EasyShop. All rights reserved.</p>
+                </footer>
+            </div>
+
+            <!-- Password Reset Success: Step 4 - Success -->
+            <div class="auth-success" data-reset-success-modal hidden aria-hidden="true">
+                <div class="auth-success__status">
+                    <h2 class="auth-success__title" th:text="#{password.reset.complete.title}">Password Reset!</h2>
+                    <p class="auth-success__message" th:text="#{password.reset.complete.success}">Your password has been reset successfully.</p>
+                </div>
+                <div class="auth-success__actions">
+                    <button type="button" class="auth-button" data-action="show-signin" th:text="#{password.reset.complete.button}">Sign In Now</button>
+                </div>
+                <footer class="auth-footer">
+                    <p class="auth-footer__text" th:text="#{login.footer.copyright(${#temporals.year(#temporals.createNow())})}">© 2025 EasyShop. All rights reserved.</p>
+                </footer>
+            </div>
+
+            <footer class="auth-footer">
+                <p class="auth-footer__text" th:text="#{login.footer.copyright(${#temporals.year(#temporals.createNow())})}">© 2025 EasyShop. All rights reserved.</p>
+            </footer>
         </section>
 
         <section class="auth-view auth-view--register" data-view="register" hidden aria-hidden="true">
@@ -135,15 +231,18 @@
                     <button type="button" class="auth-button" data-action="show-signin" th:text="#{auth.email.verified.button.signin}">Sign In</button>
                     <a class="auth-button auth-button--secondary" data-action="go-home" th:href="@{/}" th:text="#{auth.email.verified.button.store}">Go to Store</a>
                 </div>
+                <footer class="auth-footer">
+                    <p class="auth-footer__text" th:text="#{login.footer.copyright(${#temporals.year(#temporals.createNow())})}">© 2025 EasyShop. All rights reserved.</p>
+                </footer>
             </div>
 
             <!-- OTP verification modal -->
             <div class="auth-success" data-otp-modal hidden aria-hidden="true">
                 <div class="auth-success__status">
                     <h2 class="auth-success__title" th:text="#{auth.email.verified.title}">Email Verified!</h2>
-                    <p class="auth-success__message" th:text="#{login.register.modal.messageOtp}">Enter the 6-digit code we sent to your e‑mail.</p>
+                    <p class="auth-success__message" th:text="#{login.register.modal.messageOtp}">Enter the 8-digit code we sent to your e‑mail.</p>
                     <label class="auth-field">
-                        <input class="auth-field__input" type="text" inputmode="numeric" pattern="[0-9]{5,6}" maxlength="6" placeholder="123456" data-otp-input>
+                        <input class="auth-field__input" type="text" inputmode="numeric" pattern="[0-9]{8}" maxlength="8" placeholder="12345678" data-otp-input>
                     </label>
                 </div>
                 <div class="auth-success__feedback" role="status" aria-live="polite" data-otp-feedback></div>
@@ -151,6 +250,9 @@
                     <button type="button" class="auth-button" data-action="submit-otp" th:text="#{login.register.modal.confirm}">Confirm</button>
                     <a class="auth-button auth-button--secondary" data-action="resend-verification" href="#" th:text="#{login.register.modal.resend}">Send again</a>
                 </div>
+                <footer class="auth-footer">
+                    <p class="auth-footer__text" th:text="#{login.footer.copyright(${#temporals.year(#temporals.createNow())})}">© 2025 EasyShop. All rights reserved.</p>
+                </footer>
             </div>
 
             <!-- removed link-flow error modal -->
@@ -165,9 +267,16 @@
                     <button type="button" class="auth-button" data-action="show-signin" th:text="#{login.register.toggle}">Back to sign in</button>
                     <a class="auth-button auth-button--secondary" data-action="go-home" th:href="@{/}" th:text="#{login.register.modal.home}">Go to store</a>
                 </div>
+                <footer class="auth-footer">
+                    <p class="auth-footer__text" th:text="#{login.footer.copyright(${#temporals.year(#temporals.createNow())})}">© 2025 EasyShop. All rights reserved.</p>
+                </footer>
             </div>
 
             <p class="auth-note" th:text="#{login.register.footer}">By submitting the form you agree to the privacy policy.</p>
+
+            <footer class="auth-footer">
+                <p class="auth-footer__text" th:text="#{login.footer.copyright(${#temporals.year(#temporals.createNow())})}">© 2025 EasyShop. All rights reserved.</p>
+            </footer>
         </section>
     </div>
 </div>

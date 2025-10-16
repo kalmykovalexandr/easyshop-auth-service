@@ -562,10 +562,11 @@
   }
 
   function refreshSuccessResendButton() {
-    if (!successContainer) {
-      return
-    }
-    const next = successContainer.querySelector('[data-action="resend-verification"]')
+    // Find resend button in both OTP modal and success container
+    const nextInOtp = otpModal ? otpModal.querySelector('[data-action="resend-verification"]') : null
+    const nextInSuccess = successContainer ? successContainer.querySelector('[data-action="resend-verification"]') : null
+    const next = nextInOtp || nextInSuccess
+
     if (successResendButton === next) {
       return
     }
@@ -649,9 +650,9 @@
   async function submitOtp() {
     if (!otpInput) return
     const raw = otpInput.value.trim()
-    if (!/^\d{5,6}$/.test(raw)) {
+    if (!/^\d{8}$/.test(raw)) {
       if (otpFeedback) {
-        otpFeedback.textContent = registerForm?.dataset?.otpInvalid || 'Enter a valid 6-digit code.'
+        otpFeedback.textContent = registerForm?.dataset?.otpInvalid || 'Enter a valid 8-digit code.'
         otpFeedback.classList.add('auth-success__feedback--error')
       }
       return
@@ -688,7 +689,7 @@
         }
         return
       }
-      // успех: показать финальную модалку с одной кнопкой "Go to store"
+      // успех: показать финальную модалку
       if (otpModal) {
         otpModal.hidden = true
         otpModal.setAttribute('aria-hidden', 'true')
@@ -698,9 +699,6 @@
         successContainer.setAttribute('aria-hidden', 'false')
         const msgEl = successContainer.querySelector('[data-success-message]')
         if (msgEl) msgEl.textContent = registerForm?.dataset?.successOtp || (registerForm?.dataset?.successOtpText || '') || 'Registration confirmed successfully.'
-        const actions = successContainer.querySelector('.auth-success__actions')
-        const signInBtn = actions && actions.querySelector('[data-action="show-signin"]')
-        if (signInBtn) signInBtn.remove()
       }
       syncCardHeight()
     } catch (e) {
@@ -967,6 +965,210 @@
   }
 
   registerForm.addEventListener('submit', handleSubmit)
+
+  // =============================================================================
+  // Password Reset Flow
+  // =============================================================================
+
+  const forgotPasswordModal = loginSection?.querySelector('[data-forgot-password-modal]')
+  const resetOtpModal = loginSection?.querySelector('[data-reset-otp-modal]')
+  const resetPasswordModal = loginSection?.querySelector('[data-reset-password-modal]')
+  const resetSuccessModal = loginSection?.querySelector('[data-reset-success-modal]')
+
+  const resetEmailInput = forgotPasswordModal?.querySelector('[data-reset-email-input]')
+  const resetOtpInput = resetOtpModal?.querySelector('[data-reset-otp-input]')
+  const newPasswordInput = resetPasswordModal?.querySelector('[data-new-password-input]')
+  const confirmPasswordInput = resetPasswordModal?.querySelector('[data-confirm-password-input]')
+
+  const forgotFeedback = forgotPasswordModal?.querySelector('[data-forgot-feedback]')
+  const resetOtpFeedback = resetOtpModal?.querySelector('[data-reset-otp-feedback]')
+  const resetPasswordFeedback = resetPasswordModal?.querySelector('[data-reset-password-feedback]')
+
+  let resetEmail = ''
+
+  function hideAllResetModals() {
+    ;[forgotPasswordModal, resetOtpModal, resetPasswordModal, resetSuccessModal].forEach(modal => {
+      if (modal) {
+        modal.hidden = true
+        modal.setAttribute('aria-hidden', 'true')
+      }
+    })
+  }
+
+  function showResetModal(modal) {
+    hideAllResetModals()
+    if (modal) {
+      modal.hidden = false
+      modal.setAttribute('aria-hidden', 'false')
+      syncCardHeight()
+    }
+  }
+
+  function setResetFeedback(feedbackEl, message, isError = false) {
+    if (!feedbackEl) return
+    feedbackEl.textContent = message
+    if (isError) {
+      feedbackEl.classList.add('auth-success__feedback--error')
+    } else {
+      feedbackEl.classList.remove('auth-success__feedback--error')
+    }
+  }
+
+  function clearResetFeedback(feedbackEl) {
+    if (!feedbackEl) return
+    feedbackEl.textContent = ''
+    feedbackEl.classList.remove('auth-success__feedback--error')
+  }
+
+  // Step 1: Show forgot password modal
+  root.querySelectorAll('[data-action="show-forgot-password"]').forEach(element => {
+    element.addEventListener('click', (event) => {
+      event.preventDefault()
+      showResetModal(forgotPasswordModal)
+      resetEmailInput?.focus()
+      clearResetFeedback(forgotFeedback)
+      if (resetEmailInput) resetEmailInput.value = ''
+    })
+  })
+
+  // Step 1: Send reset code
+  forgotPasswordModal?.querySelector('[data-action="send-reset-code"]')?.addEventListener('click', async () => {
+    const email = resetEmailInput?.value?.trim() || ''
+
+    if (!email || !emailPattern.test(email)) {
+      setResetFeedback(forgotFeedback, 'Please enter a valid email address.', true)
+      return
+    }
+
+    clearResetFeedback(forgotFeedback)
+    resetEmail = email
+
+    try {
+      const response = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ email })
+      })
+
+      if (!response.ok) {
+        setResetFeedback(forgotFeedback, 'Could not send reset code. Please try again.', true)
+        return
+      }
+
+      // Move to OTP modal
+      showResetModal(resetOtpModal)
+      if (resetOtpInput) resetOtpInput.value = ''
+      clearResetFeedback(resetOtpFeedback)
+      resetOtpInput?.focus()
+    } catch (error) {
+      setResetFeedback(forgotFeedback, 'Network error. Please try again.', true)
+    }
+  })
+
+  // Step 1: Cancel forgot password
+  forgotPasswordModal?.querySelector('[data-action="cancel-forgot"]')?.addEventListener('click', () => {
+    hideAllResetModals()
+    syncCardHeight()
+  })
+
+  // Step 2: Verify reset code
+  resetOtpModal?.querySelector('[data-action="verify-reset-code"]')?.addEventListener('click', async () => {
+    const code = resetOtpInput?.value?.trim() || ''
+
+    if (!code || !/^\d{8}$/.test(code)) {
+      setResetFeedback(resetOtpFeedback, 'Enter a valid 8-digit code.', true)
+      return
+    }
+
+    clearResetFeedback(resetOtpFeedback)
+
+    try {
+      const response = await fetch('/api/auth/verify-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ email: resetEmail, code, purpose: 'password_reset' })
+      })
+
+      const payload = await response.json().catch(() => null)
+
+      if (!response.ok) {
+        const message = (payload && payload.detail) || 'Invalid code. Please try again.'
+        setResetFeedback(resetOtpFeedback, message, true)
+        return
+      }
+
+      if (payload && payload.status === 'VERIFIED') {
+        // Move to password reset form
+        showResetModal(resetPasswordModal)
+        if (newPasswordInput) newPasswordInput.value = ''
+        if (confirmPasswordInput) confirmPasswordInput.value = ''
+        clearResetFeedback(resetPasswordFeedback)
+        newPasswordInput?.focus()
+      }
+    } catch (error) {
+      setResetFeedback(resetOtpFeedback, 'Network error. Please try again.', true)
+    }
+  })
+
+  // Step 2: Back to forgot password
+  resetOtpModal?.querySelector('[data-action="back-to-forgot"]')?.addEventListener('click', () => {
+    showResetModal(forgotPasswordModal)
+    resetEmailInput?.focus()
+  })
+
+  // Step 3: Complete password reset
+  resetPasswordModal?.querySelector('[data-action="complete-reset"]')?.addEventListener('click', async () => {
+    const newPassword = newPasswordInput?.value || ''
+    const confirmPassword = confirmPasswordInput?.value || ''
+
+    if (!newPassword || !confirmPassword) {
+      setResetFeedback(resetPasswordFeedback, 'All fields are required.', true)
+      return
+    }
+
+    if (newPassword !== confirmPassword) {
+      setResetFeedback(resetPasswordFeedback, 'Passwords do not match.', true)
+      return
+    }
+
+    if (!isPasswordStrong(newPassword)) {
+      setResetFeedback(resetPasswordFeedback, 'Password must be at least 8 characters and include upper and lower case letters, a number, and one of @$!%*?&.', true)
+      return
+    }
+
+    clearResetFeedback(resetPasswordFeedback)
+
+    try {
+      const response = await fetch('/api/auth/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ email: resetEmail, password: newPassword, confirmPassword })
+      })
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null)
+        const message = (payload && payload.detail) || 'Could not reset password. Please try again.'
+        setResetFeedback(resetPasswordFeedback, message, true)
+        return
+      }
+
+      // Show success modal
+      showResetModal(resetSuccessModal)
+    } catch (error) {
+      setResetFeedback(resetPasswordFeedback, 'Network error. Please try again.', true)
+    }
+  })
+
+  // Step 4: Go to sign in after success
+  resetSuccessModal?.querySelector('[data-action="show-signin"]')?.addEventListener('click', (event) => {
+    event.preventDefault()
+    hideAllResetModals()
+    setMode('signin')
+    syncCardHeight()
+    const focusTarget = loginSection?.querySelector('input[name="username"]')
+    focusTarget?.focus()
+  })
+
 })()
 
 

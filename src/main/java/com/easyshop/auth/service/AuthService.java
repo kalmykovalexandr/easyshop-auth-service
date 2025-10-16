@@ -6,17 +6,12 @@ import com.easyshop.auth.entity.User;
 import com.easyshop.auth.model.EmailVerificationStatus;
 import com.easyshop.auth.model.RegistrationResult;
 import com.easyshop.auth.model.ResendVerificationResult;
+import com.easyshop.auth.model.VerificationPurpose;
 import com.easyshop.auth.repository.UserRepository;
 import com.easyshop.auth.security.VerificationCodeGenerator;
 import com.easyshop.auth.security.VerificationCodeHasher;
 import com.easyshop.auth.web.dto.AuthDto;
-import java.time.Duration;
-import java.time.LocalDateTime;
-import java.util.Locale;
-import java.util.Optional;
-import java.util.regex.Pattern;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
@@ -24,26 +19,25 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Service for handling user authentication, registration, and email verification.
- */
+import java.time.Duration;
+import java.time.LocalDateTime;
+import java.util.Locale;
+import java.util.Optional;
+
+import static com.easyshop.auth.utils.AuthUtils.isValidPassword;
+import static com.easyshop.auth.utils.AuthUtils.normalizeEmail;
+
+@Slf4j
 @Service
 public class AuthService {
-
-    private static final Logger log = LoggerFactory.getLogger(AuthService.class);
 
     private final UserRepository users;
     private final PasswordEncoder passwordEncoder;
     private final MessageSource messageSource;
     private final UserContext userContext;
     private final EmailService emailService;
-    private final VerificationCodeGenerator codeGenerator;
     private final VerificationCodeHasher codeHasher;
     private final int maxVerificationAttempts;
-
-    private static final Pattern PASSWORD_PATTERN = Pattern.compile(
-            "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[@$!%*?&])[A-Za-z\\d@$!%*?&]{8,}$"
-    );
 
     public AuthService(UserRepository users,
                        PasswordEncoder passwordEncoder,
@@ -52,58 +46,35 @@ public class AuthService {
                        EmailService emailService,
                        VerificationCodeGenerator codeGenerator,
                        VerificationCodeHasher codeHasher,
-                       @Value("${easyshop.auth.verification-max-attempts:5}") int maxVerificationAttempts) {
+                       @Value("${easyshop.auth.verification-max-attempts}") int maxVerificationAttempts) {
         this.users = users;
         this.passwordEncoder = passwordEncoder;
         this.messageSource = messageSource;
         this.userContext = userContext;
         this.emailService = emailService;
-        this.codeGenerator = codeGenerator;
         this.codeHasher = codeHasher;
         this.maxVerificationAttempts = maxVerificationAttempts;
-
-        log.info("AuthService initialized: maxVerificationAttempts={}", maxVerificationAttempts);
     }
 
-    /**
-     * Registers a new user and sends verification code via email.
-     *
-     * @param dto registration data
-     * @return registration result
-     */
     @Transactional
     public RegistrationResult register(AuthDto dto) {
-        String normalizedEmail = normalizeEmail(dto.email());
-        boolean emailInUse = users.existsByEmail(normalizedEmail);
-        boolean weakPassword = !isValidPassword(dto.password());
-
-        if (emailInUse || weakPassword) {
-            return RegistrationResult.failure(emailInUse, weakPassword);
-        }
-
         User user = new User();
-        user.setEmail(normalizedEmail);
-        user.setUsername(normalizedEmail);
-        user.setPassword(passwordEncoder.encode(dto.password()));
+        user.setEmail(dto.getEmail());
+        user.setUsername(dto.getEmail());
+        user.setPassword(passwordEncoder.encode(dto.getPassword()));
         user.setRole(User.Role.USER);
         user.setEnabled(false);
         users.save(user);
 
-        // Generate code and send email
-        String plainCode = codeGenerator.generateCode();
-        emailService.createAndSendVerificationCode(user, resolveLocale(), plainCode);
+
+        // TODO do it via Kafka messages
+        emailService.createAndSendVerificationCode(user, resolveLocale());
 
         return RegistrationResult.successful();
     }
 
-    /**
-     * Resends verification code to user's email with cooldown protection.
-     *
-     * @param email user's email
-     * @return resend result
-     */
     @Transactional
-    public ResendVerificationResult resendVerification(String email) {
+    public ResendVerificationResult sendVerificationCode(String email, VerificationPurpose purpose) {
         String normalizedEmail = normalizeEmail(email);
         if (normalizedEmail.isBlank()) {
             return ResendVerificationResult.error(getResendGenericErrorMessage());
@@ -111,13 +82,29 @@ public class AuthService {
 
         Locale locale = resolveLocale();
         Optional<User> maybeUser = users.findByEmail(normalizedEmail);
+
         if (maybeUser.isEmpty()) {
+            // For password reset, don't reveal if user exists (email enumeration protection)
+            if (purpose == VerificationPurpose.PASSWORD_RESET) {
+                return ResendVerificationResult.success("If an account exists, you will receive a code.");
+            }
             return ResendVerificationResult.notFound(getResendGenericErrorMessage());
         }
 
         User user = maybeUser.get();
-        if (Boolean.TRUE.equals(user.getEnabled())) {
-            return ResendVerificationResult.alreadyVerified(getResendAlreadyVerifiedMessage());
+
+        // Check user status based on purpose
+        if (purpose == VerificationPurpose.REGISTRATION) {
+            if (Boolean.TRUE.equals(user.getEnabled())) {
+                return ResendVerificationResult.alreadyVerified(getResendAlreadyVerifiedMessage());
+            }
+        } else if (purpose == VerificationPurpose.PASSWORD_RESET) {
+            if (!Boolean.TRUE.equals(user.getEnabled())) {
+                // User not verified yet, can't reset password
+                // Don't reveal this for security (email enumeration protection)
+                log.warn("Password reset requested for non-verified user: {}", normalizedEmail);
+                return ResendVerificationResult.success("If an account exists, you will receive a code.");
+            }
         }
 
         // Check cooldown
@@ -143,24 +130,24 @@ public class AuthService {
             return ResendVerificationResult.rateLimited(getResendCooldownMessage(seconds), seconds);
         }
 
-        // Generate and send new code
-        String plainCode = codeGenerator.generateCode();
-        emailService.createAndSendVerificationCode(user, locale, plainCode);
+
+        if (purpose == VerificationPurpose.PASSWORD_RESET) {
+            emailService.createAndSendPasswordResetCode(user, locale);
+            log.info("Password reset code sent to user: {}", user.getEmail());
+        } else {
+            emailService.createAndSendVerificationCode(user, locale);
+        }
 
         return ResendVerificationResult.success(getResendSuccessMessage());
     }
 
-    /**
-     * Verifies a user's email with the provided code.
-     * Implements "soft" rate limiting strategy: after max attempts, code is invalidated
-     * and user must request a new one.
-     *
-     * @param email user's email
-     * @param code verification code
-     * @return verification status
-     */
     @Transactional
-    public EmailVerificationStatus verifyCode(String email, String code) {
+    public ResendVerificationResult resendVerification(String email) {
+        return sendVerificationCode(email, VerificationPurpose.REGISTRATION);
+    }
+
+    @Transactional
+    public EmailVerificationStatus verifyCode(String email, String code, boolean enableUserOnSuccess) {
         String normalized = normalizeEmail(email);
         if (normalized.isBlank() || code == null || code.trim().isEmpty()) {
             return EmailVerificationStatus.INVALID;
@@ -173,8 +160,8 @@ public class AuthService {
 
         User user = maybeUser.get();
 
-        // Check if already verified
-        if (Boolean.TRUE.equals(user.getEnabled())) {
+        // For registration verification, check if already verified
+        if (enableUserOnSuccess && Boolean.TRUE.equals(user.getEnabled())) {
             return EmailVerificationStatus.ALREADY_VERIFIED;
         }
 
@@ -203,11 +190,16 @@ public class AuthService {
         boolean codeMatches = codeHasher.verifyCode(code.trim(), codeEntity.getCodeHash());
 
         if (codeMatches) {
-            // Success: activate user and delete all codes
-            user.setEnabled(true);
-            users.save(user);
-            emailService.deleteVerificationCodesForUser(user);
-            log.info("User verified successfully: {}", user.getEmail());
+            // Success: optionally activate user and delete codes
+            if (enableUserOnSuccess) {
+                user.setEnabled(true);
+                users.save(user);
+                emailService.deleteVerificationCodesForUser(user);
+                log.info("User verified successfully: {}", user.getEmail());
+            } else {
+                // For password reset, don't delete code yet - needed for password update
+                log.info("Password reset code verified for user: {}", user.getEmail());
+            }
             return EmailVerificationStatus.VERIFIED;
         } else {
             // Failed attempt: increment counter
@@ -228,17 +220,6 @@ public class AuthService {
         }
     }
 
-    // =============================================================================
-    // Helper Methods
-    // =============================================================================
-
-    /**
-     * Calculates cooldown duration based on previous attempts.
-     * Increases cooldown if there were failed verification attempts (soft strategy).
-     *
-     * @param code the verification code entity
-     * @return cooldown duration
-     */
     private Duration calculateCooldown(EmailVerificationCode code) {
         Duration baseCooldown = emailService.getResendCooldown();
 
@@ -254,16 +235,7 @@ public class AuthService {
         return baseCooldown;
     }
 
-    private String normalizeEmail(String email) {
-        return email == null ? "" : email.trim().toLowerCase(Locale.ROOT);
-    }
 
-    private boolean isValidPassword(String password) {
-        if (password == null || password.length() < 8) {
-            return false;
-        }
-        return PASSWORD_PATTERN.matcher(password).matches();
-    }
 
     private Locale resolveLocale() {
         if (userContext != null && userContext.hasLocale()) {
@@ -271,6 +243,41 @@ public class AuthService {
         }
         Locale locale = LocaleContextHolder.getLocale();
         return locale != null ? locale : Locale.ENGLISH;
+    }
+
+
+
+    // =============================================================================
+    // Password Reset Methods (reusing email verification infrastructure)
+    // =============================================================================
+
+    /**
+     * Completes password reset after successful code verification.
+     */
+    @Transactional
+    public boolean completePasswordReset(String email, String newPassword) {
+        String normalized = normalizeEmail(email);
+        Optional<User> userOpt = users.findByEmail(normalized);
+
+        if (userOpt.isEmpty()) {
+            return false;
+        }
+
+        if (!isValidPassword(newPassword)) {
+            return false;
+        }
+
+        User user = userOpt.get();
+
+        // Update password
+        user.setPassword(passwordEncoder.encode(newPassword));
+        users.save(user);
+
+        // Delete verification code
+        emailService.deleteVerificationCodesForUser(user);
+
+        log.info("Password reset completed for user: {}", user.getEmail());
+        return true;
     }
 
     // =============================================================================
@@ -304,4 +311,5 @@ public class AuthService {
     public String getResendAlreadyVerifiedMessage() {
         return messageSource.getMessage("auth.resend.alreadyVerified", null, resolveLocale());
     }
+
 }

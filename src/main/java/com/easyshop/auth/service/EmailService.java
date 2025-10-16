@@ -10,8 +10,7 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Locale;
 import java.util.Optional;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.MessageSource;
 import org.springframework.mail.MailException;
@@ -31,10 +30,9 @@ import java.io.UnsupportedEncodingException;
  * Service for managing email verification codes during user registration.
  * Handles code generation, hashing, storage, and email delivery.
  */
+@Slf4j
 @Service
 public class EmailService {
-
-    private static final Logger log = LoggerFactory.getLogger(EmailService.class);
     private static final Duration DEFAULT_CODE_TTL = Duration.ofMinutes(15);
 
     private final JavaMailSender mailSender;
@@ -87,12 +85,15 @@ public class EmailService {
      *
      * @param user User to send verification code to
      * @param locale User's locale for email content
-     * @param plainCode the plain text code to send (will be hashed before storage)
      */
     @Transactional
-    public void createAndSendVerificationCode(User user, Locale locale, String plainCode) {
+    public void createAndSendVerificationCode(User user, Locale locale) {
+
         // Delete existing codes for this user
         verificationCodeRepository.deleteByUser(user);
+
+        // Generate code and send email
+        String plainCode = codeGenerator.generateCode();
 
         // Hash the code before storing
         String codeHash = codeHasher.hashCode(plainCode);
@@ -192,6 +193,62 @@ public class EmailService {
         } catch (MailException | MessagingException | UnsupportedEncodingException e) {
             log.error("Failed to send verification email to: {}", user.getEmail(), e);
             return false;
+        }
+    }
+
+    /**
+     * Creates and sends password reset OTP code to user.
+     * Reuses email verification code infrastructure and template.
+     */
+    @Transactional
+    public void createAndSendPasswordResetCode(User user, Locale locale) {
+        // Delete existing codes for this user
+        verificationCodeRepository.deleteByUser(user);
+
+        // Generate and send new code
+        String plainCode = codeGenerator.generateCode();
+        // Hash the code before storing
+        String codeHash = codeHasher.hashCode(plainCode);
+
+        // Create and save new verification code (reusing same table)
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime expiresAt = now.plus(codeTtl);
+        EmailVerificationCode codeEntity = new EmailVerificationCode(user, codeHash, expiresAt);
+        verificationCodeRepository.save(codeEntity);
+
+        // Send password reset email (using same OTP template but different subject)
+        sendPasswordResetEmail(user, plainCode, locale);
+    }
+
+    /**
+     * Sends password reset email with OTP code.
+     * Uses the same email template as verification but with different subject.
+     */
+    private void sendPasswordResetEmail(User user, String plainCode, Locale locale) {
+        if (!isEmailConfigured()) {
+            log.warn("Email not configured, skipping password reset email for user: {}", user.getEmail());
+            return;
+        }
+
+        try {
+            String subject = messageSource.getMessage("email.password.reset.subject", null, locale);
+            // Reuse the same OTP template as email verification
+            String htmlContent = buildVerificationEmailHtml(plainCode, locale);
+
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setFrom(fromEmail, fromName);
+            helper.setTo(user.getEmail());
+            helper.setSubject(subject);
+            helper.setText(htmlContent, true);
+
+            mailSender.send(message);
+
+            log.info("Password reset OTP email sent successfully to: {}", user.getEmail());
+
+        } catch (MailException | MessagingException | UnsupportedEncodingException e) {
+            log.error("Failed to send password reset OTP email to: {}", user.getEmail(), e);
         }
     }
 

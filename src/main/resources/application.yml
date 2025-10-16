@@ -42,7 +42,7 @@ easyshop:
     from-name: ${MAIL_FROM_NAME:EasyShop}
   auth:
     # Email verification code settings (Production-grade defaults)
-    verification-code-length: ${VERIFICATION_CODE_LENGTH:6}
+    verification-code-length: ${VERIFICATION_CODE_LENGTH:8}
     verification-ttl-minutes: ${VERIFICATION_TTL_MINUTES:10}
     verification-max-attempts: ${VERIFICATION_MAX_ATTEMPTS:3}
     verification-resend-cooldown-seconds: ${VERIFICATION_RESEND_COOLDOWN_SECONDS:120}

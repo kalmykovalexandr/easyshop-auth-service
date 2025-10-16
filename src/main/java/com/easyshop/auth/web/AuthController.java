@@ -3,14 +3,14 @@ package com.easyshop.auth.web;
 import com.easyshop.auth.model.EmailVerificationStatus;
 import com.easyshop.auth.model.RegistrationResult;
 import com.easyshop.auth.model.ResendVerificationResult;
+import com.easyshop.auth.model.VerificationPurpose;
 import com.easyshop.auth.security.VerificationRateLimiter;
 import com.easyshop.auth.service.AuthService;
 import com.easyshop.auth.web.dto.AuthDto;
 import com.easyshop.auth.web.dto.ResendVerificationRequest;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -19,82 +19,51 @@ import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/**
- * Controller for authentication endpoints including registration and email verification.
- */
+@Slf4j
 @Controller
+@RequestMapping("/api/auth")
 public class AuthController {
 
-    private static final Logger log = LoggerFactory.getLogger(AuthController.class);
-
-    private final AuthService service;
+    private final AuthService authService;
     private final VerificationRateLimiter rateLimiter;
 
-    public AuthController(AuthService service, VerificationRateLimiter rateLimiter) {
-        this.service = service;
+    public AuthController(AuthService authService, VerificationRateLimiter rateLimiter) {
+        this.authService = authService;
         this.rateLimiter = rateLimiter;
     }
 
-    @GetMapping("/healthz")
-    public ResponseEntity<Map<String, Object>> health() {
-        return ResponseEntity.ok(Map.of("ok", true));
+    @PostMapping(value = "/register", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<String> register(@Valid @RequestBody AuthDto dto) {
+        authService.register(dto);
+        String success = authService.getRegistrationSuccessMessage();
+        return ResponseEntity.ok(success);
     }
 
-    @GetMapping("/readyz")
-    public ResponseEntity<Map<String, Object>> ready() {
-        return ResponseEntity.ok(Map.of("ok", true));
-    }
-
-    @PostMapping("/api/auth/register")
-    public ResponseEntity<Map<String, Object>> register(@Valid @RequestBody AuthDto dto) {
-        RegistrationResult result = service.register(dto);
-
-        if (result.hasErrors()) {
-            Map<String, String> fieldErrors = new LinkedHashMap<>();
-
-            if (result.emailInUse()) {
-                fieldErrors.put("email", service.getEmailInUseMessage());
-            }
-            if (result.weakPassword()) {
-                fieldErrors.put("password", service.getPasswordValidationMessage());
-            }
-
-            String detail = String.join(" ", fieldErrors.values());
-
-            Map<String, Object> body = new LinkedHashMap<>();
-            body.put("ok", false);
-            body.put("detail", detail.trim());
-            body.put("errors", fieldErrors);
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
-        }
-
-        String success = service.getRegistrationSuccessMessage();
-        return ResponseEntity.ok(Map.of(
-                "ok", true,
-                "message", success
-        ));
-    }
-
-    @GetMapping("/api/auth/password-requirements")
+    @GetMapping("/password-requirements")
     public ResponseEntity<String> getPasswordRequirements() {
-        return ResponseEntity.ok(service.getPasswordValidationMessage());
+        return ResponseEntity.ok(authService.getPasswordValidationMessage());
     }
 
     /**
-     * Verifies user's email with OTP code.
+     * Verifies OTP code for both email verification and password reset.
      * Includes IP-based rate limiting to prevent distributed brute-force attacks.
+     *
+     * For email verification: activates user account on success
+     * For password reset: only verifies the code without activating account
      */
-    @PostMapping(value = "/api/auth/verify-code", consumes = MediaType.APPLICATION_JSON_VALUE)
+    @PostMapping(value = "/verify-code", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<Map<String, Object>> verifyCode(
             @RequestBody Map<String, String> body,
             HttpServletRequest request) {
 
         String email = body.getOrDefault("email", "");
         String code = body.getOrDefault("code", "");
+        String purpose = body.getOrDefault("purpose", "registration"); // "registration" or "password_reset"
 
         if (email.isBlank() || code.isBlank()) {
             return ResponseEntity.badRequest().body(Map.of(
@@ -114,13 +83,15 @@ public class AuthController {
             ));
         }
 
-        // Verify the code
-        EmailVerificationStatus status = service.verifyCode(email, code);
+        // Verify the code with appropriate behavior based on purpose
+        boolean enableUserOnSuccess = !"password_reset".equals(purpose);
+        EmailVerificationStatus status = authService.verifyCode(email, code, enableUserOnSuccess);
+
         boolean ok = status == EmailVerificationStatus.VERIFIED
                 || status == EmailVerificationStatus.ALREADY_VERIFIED;
 
         if (ok) {
-            return ResponseEntity.ok(Map.of("ok", true));
+            return ResponseEntity.ok(Map.of("ok", true, "status", "VERIFIED"));
         }
 
         // Handle different error statuses
@@ -148,9 +119,9 @@ public class AuthController {
         };
     }
 
-    @PostMapping("/api/auth/resend-verification-code")
+    @PostMapping(value = "/resend-verification-code", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<Map<String, Object>> resendVerificationCode(@Valid @RequestBody ResendVerificationRequest request) {
-        ResendVerificationResult result = service.resendVerification(request.email());
+        ResendVerificationResult result = authService.resendVerification(request.email());
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("ok", result.status() == ResendVerificationResult.Status.SUCCESS);
 
@@ -183,6 +154,84 @@ public class AuthController {
                 yield ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
             }
         };
+    }
+
+    /**
+     * Initiates password reset by sending OTP code to user's email.
+     * Uses unified sendVerificationCode method with PASSWORD_RESET purpose.
+     * Always returns success to prevent email enumeration.
+     */
+    @PostMapping(value = "/forgot-password", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<Map<String, Object>> forgotPassword(@RequestBody Map<String, String> body) {
+        String email = body.getOrDefault("email", "").trim();
+
+        if (email.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "ok", false,
+                    "detail", "Email is required"
+            ));
+        }
+
+        // Send password reset code (always returns success for security)
+        ResendVerificationResult result = authService.sendVerificationCode(email, VerificationPurpose.PASSWORD_RESET);
+
+        // Handle cooldown
+        if (result.status() == ResendVerificationResult.Status.RATE_LIMITED) {
+            Map<String, Object> body2 = new LinkedHashMap<>();
+            body2.put("ok", false);
+            body2.put("detail", result.message());
+            if (result.retryAfterSeconds() != null) {
+                body2.put("retryAfterSeconds", result.retryAfterSeconds());
+            }
+            ResponseEntity.BodyBuilder builder = ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS);
+            if (result.retryAfterSeconds() != null) {
+                builder = builder.header(HttpHeaders.RETRY_AFTER, String.valueOf(result.retryAfterSeconds()));
+            }
+            return builder.body(body2);
+        }
+
+        return ResponseEntity.ok(Map.of(
+                "ok", true,
+                "message", result.message()
+        ));
+    }
+
+    /**
+     * Completes password reset with new password.
+     */
+    @PostMapping(value = "/reset-password", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<Map<String, Object>> resetPassword(@RequestBody Map<String, String> body) {
+        String email = body.getOrDefault("email", "");
+        String newPassword = body.getOrDefault("password", "");
+        String confirmPassword = body.getOrDefault("confirmPassword", "");
+
+        if (email.isBlank() || newPassword.isBlank() || confirmPassword.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "ok", false,
+                    "detail", "All fields are required"
+            ));
+        }
+
+        if (!newPassword.equals(confirmPassword)) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "ok", false,
+                    "detail", "Passwords do not match"
+            ));
+        }
+
+        boolean success = authService.completePasswordReset(email, newPassword);
+
+        if (!success) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "ok", false,
+                    "detail", "Could not reset password. Please ensure your password meets the requirements."
+            ));
+        }
+
+        return ResponseEntity.ok(Map.of(
+                "ok", true,
+                "message", "Password reset successfully"
+        ));
     }
 
     /**

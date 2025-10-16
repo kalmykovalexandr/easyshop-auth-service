@@ -3,34 +3,151 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title th:text="#{email.verification.subject}">OTP - EasyShop</title>
+    <title th:text="#{email.verification.subject}">Email Verification - EasyShop</title>
     <style>
-        body {font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen,Ubuntu,Cantarell,sans-serif;line-height:1.6;color:#333;max-width:600px;margin:0 auto;padding:20px;background:#f8f9fa}
-        .email-container{background:#fff;border-radius:12px;box-shadow:0 4px 6px rgba(0,0,0,.1);overflow:hidden}
-        .header{background:#22c55e;color:#fff;padding:30px;text-align:center}
-        .header h1{margin:0;font-size:24px;font-weight:600}
-        .content{padding:40px 30px;text-align:center}
-        .code{display:inline-block;margin:16px 0;padding:12px 18px;border-radius:8px;background:#ecfdf5;color:#065f46;font-weight:700;font-size:24px;letter-spacing:4px}
-        .footer{background:#f8f9fa;padding:30px;text-align:center;border-top:1px solid #e5e7eb}
-        .footer p{color:#6b7280;font-size:14px;margin:0}
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            line-height: 1.6;
+            color: #1f2937;
+            background: #f3f4f6;
+            padding: 40px 20px;
+        }
+        .email-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: #ffffff;
+            border-radius: 16px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+            color: #ffffff;
+            padding: 40px 30px;
+            text-align: center;
+        }
+        .header h1 {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+        .content {
+            padding: 48px 40px;
+            text-align: center;
+        }
+        .content h2 {
+            font-size: 20px;
+            font-weight: 600;
+            color: #111827;
+            margin-bottom: 16px;
+        }
+        .content p {
+            font-size: 15px;
+            color: #6b7280;
+            margin-bottom: 32px;
+            line-height: 1.7;
+        }
+        .code-label {
+            font-size: 14px;
+            font-weight: 500;
+            color: #374151;
+            margin-bottom: 12px;
+            display: block;
+        }
+        .code-box {
+            display: inline-block;
+            background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+            border: 2px solid #10b981;
+            border-radius: 12px;
+            padding: 24px 40px;
+            margin: 0 0 32px 0;
+        }
+        .code {
+            font-size: 42px;
+            font-weight: 700;
+            color: #065f46;
+            letter-spacing: 8px;
+            font-family: 'Courier New', Courier, monospace;
+        }
+        .expiry-notice {
+            display: inline-block;
+            background: #fef3c7;
+            border: 1px solid #f59e0b;
+            border-radius: 8px;
+            padding: 12px 20px;
+            margin-bottom: 24px;
+            font-size: 14px;
+            color: #92400e;
+        }
+        .security-notice {
+            background: #f3f4f6;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 32px;
+        }
+        .security-notice p {
+            font-size: 13px;
+            color: #6b7280;
+            margin: 0;
+        }
+        .footer {
+            background: #f9fafb;
+            padding: 32px;
+            text-align: center;
+            border-top: 1px solid #e5e7eb;
+        }
+        .footer p {
+            font-size: 13px;
+            color: #9ca3af;
+            margin-bottom: 8px;
+        }
+        .footer a {
+            color: #6366f1;
+            text-decoration: none;
+        }
+        .footer a:hover {
+            text-decoration: underline;
+        }
     </style>
- </head>
- <body>
- <div class="email-container">
-   <div class="header">
-     <h1 th:text="#{email.verification.title}">EasyShop</h1>
-   </div>
-   <div class="content">
-     <h2 th:text="#{email.verification.header}">Please confirm your email address</h2>
-     <p th:text="#{email.verification.message}">Thanks for signing up to EasyShop. We're happy to have you.</p>
-     <div class="code" th:text="${verificationCode}">123456</div>
-     <p th:text="#{email.verification.footer}">Best regards, The EasyShop Team</p>
-   </div>
-   <div class="footer">
-     <p>Do not share this code with anyone.</p>
-   </div>
- </div>
- </body>
- </html>
+</head>
+<body>
+    <div class="email-container">
+        <div class="header">
+            <h1>EasyShop</h1>
+        </div>
 
+        <div class="content">
+            <h2 th:text="#{email.verification.header}">Email Verification</h2>
+            <p th:text="#{email.verification.message}">Thank you for registering with EasyShop! Please use the verification code below to complete your registration.</p>
 
+            <span class="code-label">Your verification code is:</span>
+
+            <div class="code-box">
+                <div class="code" th:text="${verificationCode}">12345678</div>
+            </div>
+
+            <div class="expiry-notice">
+                ⏱️ This code will expire in <strong>10 minutes</strong> and can only be used once.
+            </div>
+
+            <div class="security-notice">
+                <p>
+                    <strong>🔒 Security Notice:</strong><br>
+                    Never share this code with anyone. EasyShop support will never ask for your verification code.
+                    If you didn't request this code, please ignore this email or contact our support team.
+                </p>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>This email was sent by EasyShop</p>
+            <p>
+                If you believe you are getting this email in error or want to close your account, please visit our
+                <a href="https://easyshop.com/support">support site</a>
+            </p>
+            <p style="margin-top: 16px;">© 2025 EasyShop. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>
