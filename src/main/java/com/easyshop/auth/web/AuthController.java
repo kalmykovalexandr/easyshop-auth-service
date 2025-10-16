@@ -44,26 +44,12 @@ public class AuthController {
         return ResponseEntity.ok(success);
     }
 
-    @GetMapping("/password-requirements")
-    public ResponseEntity<String> getPasswordRequirements() {
-        return ResponseEntity.ok(authService.getPasswordValidationMessage());
-    }
-
-    /**
-     * Verifies OTP code for both email verification and password reset.
-     * Includes IP-based rate limiting to prevent distributed brute-force attacks.
-     *
-     * For email verification: activates user account on success
-     * For password reset: only verifies the code without activating account
-     */
     @PostMapping(value = "/verify-code", consumes = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<Map<String, Object>> verifyCode(
-            @RequestBody Map<String, String> body,
-            HttpServletRequest request) {
+    public ResponseEntity<Map<String, Object>> verifyCode(@RequestBody Map<String, String> body, HttpServletRequest request) {
 
         String email = body.getOrDefault("email", "");
         String code = body.getOrDefault("code", "");
-        String purpose = body.getOrDefault("purpose", "registration"); // "registration" or "password_reset"
+        String purpose = body.getOrDefault("purpose", "registration");
 
         if (email.isBlank() || code.isBlank()) {
             return ResponseEntity.badRequest().body(Map.of(
@@ -87,8 +73,7 @@ public class AuthController {
         boolean enableUserOnSuccess = !"password_reset".equals(purpose);
         EmailVerificationStatus status = authService.verifyCode(email, code, enableUserOnSuccess);
 
-        boolean ok = status == EmailVerificationStatus.VERIFIED
-                || status == EmailVerificationStatus.ALREADY_VERIFIED;
+        boolean ok = status == EmailVerificationStatus.VERIFIED || status == EmailVerificationStatus.ALREADY_VERIFIED;
 
         if (ok) {
             return ResponseEntity.ok(Map.of("ok", true, "status", "VERIFIED"));
@@ -156,11 +141,6 @@ public class AuthController {
         };
     }
 
-    /**
-     * Initiates password reset by sending OTP code to user's email.
-     * Uses unified sendVerificationCode method with PASSWORD_RESET purpose.
-     * Always returns success to prevent email enumeration.
-     */
     @PostMapping(value = "/forgot-password", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<Map<String, Object>> forgotPassword(@RequestBody Map<String, String> body) {
         String email = body.getOrDefault("email", "").trim();
@@ -196,9 +176,6 @@ public class AuthController {
         ));
     }
 
-    /**
-     * Completes password reset with new password.
-     */
     @PostMapping(value = "/reset-password", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<Map<String, Object>> resetPassword(@RequestBody Map<String, String> body) {
         String email = body.getOrDefault("email", "");
@@ -234,12 +211,6 @@ public class AuthController {
         ));
     }
 
-    /**
-     * Extracts client IP address from request, handling X-Forwarded-For header.
-     *
-     * @param request HTTP servlet request
-     * @return client IP address
-     */
     private String extractClientIp(HttpServletRequest request) {
         String xForwardedFor = request.getHeader("X-Forwarded-For");
         if (xForwardedFor != null && !xForwardedFor.isBlank()) {
