@@ -1,9 +1,6 @@
-package com.easyshop.auth.web;
+package com.easyshop.auth.exception;
 
-import com.easyshop.auth.exception.BusinessException;
-import com.easyshop.auth.exception.ErrorCode;
-import com.easyshop.auth.exception.RateLimitExceededException;
-import com.easyshop.auth.web.dto.error.ErrorResponse;
+import com.easyshop.auth.model.dto.error.ErrorResponse;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;

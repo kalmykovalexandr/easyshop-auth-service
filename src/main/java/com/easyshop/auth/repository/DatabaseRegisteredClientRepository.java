@@ -1,7 +1,6 @@
-package com.easyshop.auth.service;
+package com.easyshop.auth.repository;
 
-import com.easyshop.auth.entity.OAuth2Client;
-import com.easyshop.auth.repository.OAuth2ClientRepository;
+import com.easyshop.auth.model.entity.OAuth2Client;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;

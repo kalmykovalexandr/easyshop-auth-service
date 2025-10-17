@@ -1,4 +1,4 @@
-package com.easyshop.auth.entity;
+package com.easyshop.auth.model.entity;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;

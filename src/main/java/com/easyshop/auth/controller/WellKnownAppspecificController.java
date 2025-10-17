@@ -1,4 +1,4 @@
-package com.easyshop.auth.web;
+package com.easyshop.auth.controller;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;

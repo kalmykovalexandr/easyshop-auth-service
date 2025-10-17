@@ -1,4 +1,4 @@
-package com.easyshop.auth.web;
+package com.easyshop.auth.controller;
 
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;

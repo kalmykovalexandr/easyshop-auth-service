@@ -1,6 +1,6 @@
 package com.easyshop.auth.repository;
 
-import com.easyshop.auth.entity.OAuth2Client;
+import com.easyshop.auth.model.entity.OAuth2Client;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;

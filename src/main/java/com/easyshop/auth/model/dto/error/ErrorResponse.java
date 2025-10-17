@@ -1,4 +1,4 @@
-package com.easyshop.auth.web.dto.error;
+package com.easyshop.auth.model.dto.error;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.Builder;

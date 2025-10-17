@@ -1,7 +1,9 @@
-package com.easyshop.auth.entity;
+package com.easyshop.auth.model.entity;
 
+import com.easyshop.auth.model.dto.AuthDto;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.security.core.GrantedAuthority;
@@ -15,6 +17,7 @@ import java.util.Collections;
 @Entity
 @Table(name = "\"user\"", schema = "auth")
 @Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class User implements UserDetails {
@@ -34,18 +37,23 @@ public class User implements UserDetails {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
+    @Builder.Default
     private Role role = Role.USER;
 
     @Column(nullable = false)
+    @Builder.Default
     private Boolean enabled = true;
 
     @Column(nullable = false)
+    @Builder.Default
     private Boolean accountNonExpired = true;
 
     @Column(nullable = false)
+    @Builder.Default
     private Boolean accountNonLocked = true;
 
     @Column(nullable = false)
+    @Builder.Default
     private Boolean credentialsNonExpired = true;
 
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -102,6 +110,15 @@ public class User implements UserDetails {
 
     public enum Role {
         USER, ADMIN
+    }
+
+    public static User from(AuthDto dto, String encodedPwd, Boolean enabled) {
+        return User.builder()
+                .email(dto.getEmail())
+                .username(dto.getEmail())
+                .password(encodedPwd)
+                .enabled(enabled)
+                .build();
     }
 }
 

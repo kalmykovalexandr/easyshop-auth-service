@@ -9,9 +9,9 @@ import lombok.Getter;
 @Getter
 public class RateLimitExceededException extends BusinessException {
 
-    private final Long retryAfterSeconds;
+    private final int retryAfterSeconds;
 
-    public RateLimitExceededException(Long retryAfterSeconds) {
+    public RateLimitExceededException(int retryAfterSeconds) {
         super(ErrorCode.RATE_LIMIT_EXCEEDED, retryAfterSeconds);
         this.retryAfterSeconds = retryAfterSeconds;
     }

@@ -1,4 +1,4 @@
-package com.easyshop.auth.web.dto;
+package com.easyshop.auth.model.dto;
 
 import com.easyshop.auth.validation.UniqueEmail;
 import jakarta.validation.constraints.*;

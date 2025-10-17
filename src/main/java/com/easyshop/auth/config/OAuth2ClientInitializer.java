@@ -1,6 +1,6 @@
-package com.easyshop.auth.service;
+package com.easyshop.auth.config;
 
-import com.easyshop.auth.entity.OAuth2Client;
+import com.easyshop.auth.model.entity.OAuth2Client;
 import com.easyshop.auth.repository.OAuth2ClientRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
