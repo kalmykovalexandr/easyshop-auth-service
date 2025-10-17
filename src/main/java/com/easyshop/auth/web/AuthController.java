@@ -40,8 +40,7 @@ public class AuthController {
     @PostMapping(value = "/register", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<String> register(@Valid @RequestBody AuthDto dto) {
         authService.register(dto);
-        String success = authService.getRegistrationSuccessMessage();
-        return ResponseEntity.ok(success);
+        return ResponseEntity.ok().build();
     }
 
     @PostMapping(value = "/verify-code", consumes = MediaType.APPLICATION_JSON_VALUE)

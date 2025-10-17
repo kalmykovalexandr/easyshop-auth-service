@@ -1,10 +1,10 @@
 package com.easyshop.auth.web;
 
-import com.easyshop.auth.exception.ApplicationException;
+import com.easyshop.auth.exception.BusinessException;
 import com.easyshop.auth.exception.ErrorCode;
 import com.easyshop.auth.exception.RateLimitExceededException;
-import com.easyshop.auth.service.LocalizedMessageSource;
 import com.easyshop.auth.web.dto.error.ErrorResponse;
+import jakarta.persistence.EntityNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.env.Environment;
@@ -29,11 +29,13 @@ import java.util.Map;
 
 /**
  * Centralized exception handler for all application errors.
- * Provides consistent error response format and internationalization support.
+ * Returns consistent error response format with English messages and error codes.
+ * Client is responsible for translating error codes to user's language.
  *
  * Handles:
  * - Validation errors (@Valid, @Validated)
- * - Custom business exceptions (ApplicationException)
+ * - Custom business exceptions (BusinessException)
+ * - JPA exceptions (EntityNotFoundException)
  * - Spring framework exceptions
  * - Database exceptions
  * - Generic unexpected errors
@@ -42,17 +44,15 @@ import java.util.Map;
 @ControllerAdvice
 public class GlobalExceptionHandler {
 
-    private final LocalizedMessageSource messageSource;
     private final Environment environment;
 
-    public GlobalExceptionHandler(LocalizedMessageSource messageSource, Environment environment) {
-        this.messageSource = messageSource;
+    public GlobalExceptionHandler(Environment environment) {
         this.environment = environment;
     }
 
     /**
      * Handles validation errors from @Valid/@Validated annotations.
-     * Returns field-specific error messages.
+     * Returns field-specific error codes for client-side translation.
      */
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidationErrors(
@@ -63,37 +63,14 @@ public class GlobalExceptionHandler {
 
         for (FieldError error : ex.getBindingResult().getFieldErrors()) {
             String field = error.getField();
-            String code = error.getCode();
-            String message;
-
-            // Resolve i18n messages based on field and constraint type
-            if ("email".equals(field)) {
-                if ("UniqueEmail".equals(code)) {
-                    message = messageSource.getMessage("auth.register.error.emailUsed");
-                } else if ("Email".equals(code)) {
-                    message = messageSource.getMessage("login.register.error.email");
-                } else {
-                    message = error.getDefaultMessage();
-                }
-            } else if ("password".equals(field)) {
-                if ("Pattern".equals(code)) {
-                    message = messageSource.getMessage("login.register.error.password");
-                } else {
-                    message = error.getDefaultMessage();
-                }
-            } else {
-                message = error.getDefaultMessage();
-            }
-
-            fieldErrors.put(field, message);
+            String errorCode = mapValidationErrorToCode(error);
+            fieldErrors.put(field, errorCode);
         }
 
-        String detail = String.join(" ", fieldErrors.values());
-
         ErrorResponse response = ErrorResponse.builder()
-                .detail(detail.trim())
+                .detail(ErrorCode.VALIDATION_ERROR.getMessage())
                 .errors(fieldErrors)
-                .errorCode("VALIDATION_ERROR")
+                .errorCode(ErrorCode.VALIDATION_ERROR.name())
                 .status(HttpStatus.BAD_REQUEST.name())
                 .statusCode(HttpStatus.BAD_REQUEST.value())
                 .path(request.getRequestURI())
@@ -105,21 +82,44 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * Handles all custom business logic exceptions.
-     * Automatically resolves i18n messages and HTTP status codes.
+     * Maps Bean Validation constraint violations to error codes.
      */
-    @ExceptionHandler(ApplicationException.class)
-    public ResponseEntity<ErrorResponse> handleApplicationException(
-            ApplicationException ex,
+    private String mapValidationErrorToCode(FieldError error) {
+        String field = error.getField();
+        String constraintCode = error.getCode();
+
+        return switch (field) {
+            case "email" -> switch (constraintCode) {
+                case "UniqueEmail" -> ErrorCode.EMAIL_ALREADY_USED.name();
+                case "Email" -> ErrorCode.EMAIL_INVALID.name();
+                case "NotBlank" -> ErrorCode.EMAIL_REQUIRED.name();
+                default -> ErrorCode.FIELD_INVALID.name();
+            };
+            case "password" -> switch (constraintCode) {
+                case "Pattern" -> ErrorCode.PASSWORD_WEAK.name();
+                case "NotBlank" -> ErrorCode.PASSWORD_REQUIRED.name();
+                default -> ErrorCode.PASSWORD_INVALID.name();
+            };
+            default -> ErrorCode.FIELD_INVALID.name();
+        };
+    }
+
+    /**
+     * Handles all custom business logic exceptions.
+     */
+    @ExceptionHandler(BusinessException.class)
+    public ResponseEntity<ErrorResponse> handleBusinessException(
+            BusinessException ex,
             HttpServletRequest request) {
 
-        String message = messageSource.getMessage(ex.getErrorCode().getMessageKey(), ex.getMessageArgs());
+        ErrorCode errorCode = ex.getErrorCode();
+        HttpStatus httpStatus = errorCode.getHttpStatus();
 
         ErrorResponse.ErrorResponseBuilder builder = ErrorResponse.builder()
-                .detail(message)
-                .errorCode(ex.getErrorCode().name())
-                .status(ex.getHttpStatus().name())
-                .statusCode(ex.getHttpStatus().value())
+                .detail(ex.getMessage())
+                .errorCode(errorCode.name())
+                .status(httpStatus.name())
+                .statusCode(httpStatus.value())
                 .path(request.getRequestURI());
 
         // Add retry-after for rate limit exceptions
@@ -130,21 +130,43 @@ public class GlobalExceptionHandler {
         ErrorResponse response = builder.build();
 
         // Log based on severity
-        if (ex.getHttpStatus().is5xxServerError()) {
-            log.error("Application error at {}: {}", request.getRequestURI(), ex.getMessage(), ex);
+        if (httpStatus.is5xxServerError()) {
+            log.error("Business exception at {}: {}", request.getRequestURI(), ex.getMessage(), ex);
         } else {
-            log.warn("Application error at {}: {} - {}", request.getRequestURI(), ex.getErrorCode(), message);
+            log.warn("Business exception at {}: {} - {}", request.getRequestURI(), errorCode, ex.getMessage());
         }
 
         // Add Retry-After header for rate limiting
         if (ex instanceof RateLimitExceededException rateLimitEx) {
             return ResponseEntity
-                    .status(ex.getHttpStatus())
+                    .status(httpStatus)
                     .header(HttpHeaders.RETRY_AFTER, String.valueOf(rateLimitEx.getRetryAfterSeconds()))
                     .body(response);
         }
 
-        return ResponseEntity.status(ex.getHttpStatus()).body(response);
+        return ResponseEntity.status(httpStatus).body(response);
+    }
+
+    /**
+     * Handles JPA EntityNotFoundException.
+     * Converts to our standard error response format.
+     */
+    @ExceptionHandler(EntityNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleEntityNotFound(
+            EntityNotFoundException ex,
+            HttpServletRequest request) {
+
+        ErrorResponse response = ErrorResponse.builder()
+                .detail(ErrorCode.RESOURCE_NOT_FOUND.getMessage())
+                .errorCode(ErrorCode.RESOURCE_NOT_FOUND.name())
+                .status(HttpStatus.NOT_FOUND.name())
+                .statusCode(HttpStatus.NOT_FOUND.value())
+                .path(request.getRequestURI())
+                .build();
+
+        log.warn("Entity not found at {}: {}", request.getRequestURI(), ex.getMessage());
+
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
     }
 
     /**
@@ -155,10 +177,8 @@ public class GlobalExceptionHandler {
             AccessDeniedException ex,
             HttpServletRequest request) {
 
-        String message = messageSource.getMessage(ErrorCode.ACCESS_DENIED.getMessageKey());
-
         ErrorResponse response = ErrorResponse.builder()
-                .detail(message)
+                .detail(ErrorCode.ACCESS_DENIED.getMessage())
                 .errorCode(ErrorCode.ACCESS_DENIED.name())
                 .status(HttpStatus.FORBIDDEN.name())
                 .statusCode(HttpStatus.FORBIDDEN.value())
@@ -178,10 +198,8 @@ public class GlobalExceptionHandler {
             Exception ex,
             HttpServletRequest request) {
 
-        String message = messageSource.getMessage(ErrorCode.DATABASE_ERROR.getMessageKey());
-
         ErrorResponse.ErrorResponseBuilder builder = ErrorResponse.builder()
-                .detail(message)
+                .detail(ErrorCode.DATABASE_ERROR.getMessage())
                 .errorCode(ErrorCode.DATABASE_ERROR.name())
                 .status(HttpStatus.INTERNAL_SERVER_ERROR.name())
                 .statusCode(HttpStatus.INTERNAL_SERVER_ERROR.value())
@@ -206,9 +224,7 @@ public class GlobalExceptionHandler {
             MethodArgumentTypeMismatchException ex,
             HttpServletRequest request) {
 
-        String message = messageSource.getMessage(
-                ErrorCode.INVALID_PARAMETER.getMessageKey(),
-                new Object[]{ex.getName(), ex.getValue()});
+        String message = String.format(ErrorCode.INVALID_PARAMETER.getMessage(), ex.getName(), ex.getValue());
 
         ErrorResponse response = ErrorResponse.builder()
                 .detail(message)
@@ -232,13 +248,9 @@ public class GlobalExceptionHandler {
             MissingServletRequestParameterException ex,
             HttpServletRequest request) {
 
-        String message = messageSource.getMessage(
-                ErrorCode.MISSING_REQUIRED_FIELD.getMessageKey(),
-                new Object[]{ex.getParameterName()});
-
         ErrorResponse response = ErrorResponse.builder()
-                .detail(message)
-                .errorCode(ErrorCode.MISSING_REQUIRED_FIELD.name())
+                .detail(ErrorCode.FIELD_REQUIRED.getMessage())
+                .errorCode(ErrorCode.FIELD_REQUIRED.name())
                 .status(HttpStatus.BAD_REQUEST.name())
                 .statusCode(HttpStatus.BAD_REQUEST.value())
                 .path(request.getRequestURI())
@@ -257,10 +269,8 @@ public class GlobalExceptionHandler {
             HttpMediaTypeNotSupportedException ex,
             HttpServletRequest request) {
 
-        String message = messageSource.getMessage(ErrorCode.UNSUPPORTED_MEDIA_TYPE.getMessageKey());
-
         ErrorResponse response = ErrorResponse.builder()
-                .detail(message)
+                .detail(ErrorCode.UNSUPPORTED_MEDIA_TYPE.getMessage())
                 .errorCode(ErrorCode.UNSUPPORTED_MEDIA_TYPE.name())
                 .status(HttpStatus.UNSUPPORTED_MEDIA_TYPE.name())
                 .statusCode(HttpStatus.UNSUPPORTED_MEDIA_TYPE.value())
@@ -280,9 +290,7 @@ public class GlobalExceptionHandler {
             HttpRequestMethodNotSupportedException ex,
             HttpServletRequest request) {
 
-        String message = messageSource.getMessage(
-                ErrorCode.METHOD_NOT_ALLOWED.getMessageKey(),
-                new Object[]{ex.getMethod()});
+        String message = String.format(ErrorCode.METHOD_NOT_ALLOWED.getMessage(), ex.getMethod());
 
         ErrorResponse response = ErrorResponse.builder()
                 .detail(message)
@@ -306,10 +314,8 @@ public class GlobalExceptionHandler {
             Exception ex,
             HttpServletRequest request) {
 
-        String message = messageSource.getMessage(ErrorCode.INTERNAL_SERVER_ERROR.getMessageKey());
-
         ErrorResponse.ErrorResponseBuilder builder = ErrorResponse.builder()
-                .detail(message)
+                .detail(ErrorCode.INTERNAL_SERVER_ERROR.getMessage())
                 .errorCode(ErrorCode.INTERNAL_SERVER_ERROR.name())
                 .status(HttpStatus.INTERNAL_SERVER_ERROR.name())
                 .statusCode(HttpStatus.INTERNAL_SERVER_ERROR.value())

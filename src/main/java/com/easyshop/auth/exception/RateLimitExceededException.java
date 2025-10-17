@@ -1,19 +1,18 @@
 package com.easyshop.auth.exception;
 
 import lombok.Getter;
-import org.springframework.http.HttpStatus;
 
 /**
  * Exception thrown when rate limit is exceeded.
- * Results in HTTP 429 Too Many Requests response.
+ * Results in HTTP 429 Too Many Requests response with Retry-After header.
  */
 @Getter
-public class RateLimitExceededException extends ApplicationException {
+public class RateLimitExceededException extends BusinessException {
 
     private final Long retryAfterSeconds;
 
     public RateLimitExceededException(Long retryAfterSeconds) {
-        super(ErrorCode.RATE_LIMIT_EXCEEDED, HttpStatus.TOO_MANY_REQUESTS, retryAfterSeconds);
+        super(ErrorCode.RATE_LIMIT_EXCEEDED, retryAfterSeconds);
         this.retryAfterSeconds = retryAfterSeconds;
     }
 }

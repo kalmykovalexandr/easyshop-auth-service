@@ -13,6 +13,7 @@ import com.easyshop.auth.security.VerificationCodeHasher;
 import com.easyshop.auth.web.dto.AuthDto;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -32,7 +33,7 @@ public class AuthService {
 
     private final UserRepository users;
     private final PasswordEncoder passwordEncoder;
-    private final LocalizedMessageSource messageSource;
+    private final MessageSource messageSource;
     private final UserContext userContext;
     private final EmailService emailService;
     private final VerificationCodeHasher codeHasher;
@@ -40,7 +41,7 @@ public class AuthService {
 
     public AuthService(UserRepository users,
                        PasswordEncoder passwordEncoder,
-                       LocalizedMessageSource messageSource,
+                       MessageSource messageSource,
                        UserContext userContext,
                        EmailService emailService,
                        VerificationCodeGenerator codeGenerator,
@@ -56,7 +57,7 @@ public class AuthService {
     }
 
     @Transactional
-    public RegistrationResult register(AuthDto dto) {
+    public void register(AuthDto dto) {
         User user = new User();
         user.setEmail(dto.getEmail());
         user.setUsername(dto.getEmail());
@@ -65,11 +66,8 @@ public class AuthService {
         user.setEnabled(false);
         users.save(user);
 
-
         // TODO do it via Kafka messages
         emailService.createAndSendVerificationCode(user, resolveLocale());
-
-        return RegistrationResult.successful();
     }
 
     @Transactional
@@ -284,31 +282,31 @@ public class AuthService {
     // =============================================================================
 
     public String getEmailInUseMessage() {
-        return messageSource.getMessage("auth.register.error.emailUsed");
+        return messageSource.getMessage("auth.register.error.emailUsed", null, resolveLocale());
     }
 
     public String getPasswordValidationMessage() {
-        return messageSource.getMessage("auth.password.requirements");
+        return messageSource.getMessage("auth.password.requirements", null, resolveLocale());
     }
 
     public String getRegistrationSuccessMessage() {
-        return messageSource.getMessage("auth.register.success");
+        return messageSource.getMessage("auth.register.success", null, resolveLocale());
     }
 
     public String getResendSuccessMessage() {
-        return messageSource.getMessage("login.register.modal.resendSuccess");
+        return messageSource.getMessage("login.register.modal.resendSuccess", null, resolveLocale());
     }
 
     public String getResendGenericErrorMessage() {
-        return messageSource.getMessage("login.register.modal.resendError");
+        return messageSource.getMessage("login.register.modal.resendError", null, resolveLocale());
     }
 
     public String getResendCooldownMessage(long seconds) {
-        return messageSource.getMessage("auth.resend.cooldown", new Object[]{seconds});
+        return messageSource.getMessage("auth.resend.cooldown", new Object[]{seconds}, resolveLocale());
     }
 
     public String getResendAlreadyVerifiedMessage() {
-        return messageSource.getMessage("auth.resend.alreadyVerified");
+        return messageSource.getMessage("auth.resend.alreadyVerified", null, resolveLocale());
     }
 
 }

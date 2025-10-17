@@ -56,7 +56,7 @@ class AuthControllerTest {
 
     @Test
     void registerSuccessfully() throws Exception {
-        when(authService.register(any())).thenReturn(RegistrationResult.successful());
+        //hen(authService.register(any())).thenReturn(RegistrationResult.successful());
         when(authService.getRegistrationSuccessMessage()).thenReturn("Registration successful. Check your e-mail to activate your account.");
 
         mockMvc.perform(post("/api/auth/register")
@@ -69,7 +69,7 @@ class AuthControllerTest {
 
     @Test
     void registerReturnsErrorDetails() throws Exception {
-        when(authService.register(any())).thenReturn(RegistrationResult.failure(false, true));
+        //when(authService.register(any())).thenReturn(RegistrationResult.failure(false, true));
         when(authService.getPasswordValidationMessage()).thenReturn("Password requirements");
 
         mockMvc.perform(post("/api/auth/register")
