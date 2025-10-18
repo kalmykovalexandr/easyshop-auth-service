@@ -35,5 +35,3 @@ CREATE INDEX IF NOT EXISTS idx_email_verification_code_expires
 -- Enforce single active code per user
 CREATE UNIQUE INDEX IF NOT EXISTS uq_email_verification_code_user
     ON auth.email_verification_code(user_id);
-
-

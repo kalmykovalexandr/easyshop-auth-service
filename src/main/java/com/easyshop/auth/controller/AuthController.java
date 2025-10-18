@@ -4,9 +4,9 @@ import com.easyshop.auth.model.dto.AuthDto;
 import com.easyshop.auth.model.dto.OtpSendDto;
 import com.easyshop.auth.model.dto.PasswordResetDto;
 import com.easyshop.auth.model.dto.VerifyCodeDto;
+import com.easyshop.auth.model.dto.VerifyCodeResponseDto;
 import com.easyshop.auth.service.AuthServiceInt;
 import com.easyshop.auth.service.OtpServiceInt;
-import com.easyshop.auth.service.impl.AuthService;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
@@ -24,7 +24,7 @@ public class AuthController {
     private final AuthServiceInt authService;
     private final OtpServiceInt otpService;
 
-    public AuthController(AuthService authService,
+    public AuthController(AuthServiceInt authService,
                           OtpServiceInt otpService) {
         this.authService = authService;
         this.otpService = otpService;
@@ -43,9 +43,11 @@ public class AuthController {
     }
 
     @PostMapping(value = "/verify-code", consumes = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<Void> verifyCode(@Valid @RequestBody VerifyCodeDto dto) {
-        otpService.verifyOtp(dto);
-        return ResponseEntity.accepted().build();
+    public ResponseEntity<VerifyCodeResponseDto> verifyCode(@Valid @RequestBody VerifyCodeDto dto) {
+        VerifyCodeResponseDto response = otpService.verifyOtp(dto);
+        return response == null ?
+                ResponseEntity.noContent().build() : // registration flow
+                ResponseEntity.ok(response);         // forgot login flow
     }
 
     @PostMapping(value = "/reset-password", consumes = MediaType.APPLICATION_JSON_VALUE)

@@ -46,12 +46,14 @@ public class AuthService implements AuthServiceInt {
     @Override
     @Transactional
     public void resetPassword(PasswordResetDto request) {
-        User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
-
         if (!request.getPassword().equals(request.getConfirmPassword())) {
             throw new BusinessException(ErrorCode.PASSWORDS_DO_NOT_MATCH);
         }
+
+        otpService.validateResetToken(request.getEmail(), request.getResetToken());
+
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         userRepository.save(user);

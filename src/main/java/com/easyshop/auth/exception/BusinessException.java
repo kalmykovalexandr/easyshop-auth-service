@@ -4,14 +4,7 @@ import lombok.Getter;
 
 import java.text.MessageFormat;
 
-/**
- * Generic business logic exception.
- * Use this for all business logic errors by passing appropriate ErrorCode.
- *
- * Example:
- * throw new BusinessException(ErrorCode.VERIFICATION_CODE_EXPIRED);
- * throw new BusinessException(ErrorCode.VERIFICATION_COOLDOWN, 60);
- */
+
 @Getter
 public class BusinessException extends RuntimeException {
 
@@ -34,12 +27,6 @@ public class BusinessException extends RuntimeException {
         super(errorCode.getMessage(), cause);
         this.errorCode = errorCode;
         this.messageArgs = null;
-    }
-
-    public BusinessException(ErrorCode errorCode, Throwable cause, Object... messageArgs) {
-        super(formatMessage(errorCode.getMessage(), messageArgs), cause);
-        this.errorCode = errorCode;
-        this.messageArgs = messageArgs;
     }
 
     private static String formatMessage(String pattern, Object[] args) {

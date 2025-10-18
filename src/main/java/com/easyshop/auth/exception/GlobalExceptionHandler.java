@@ -3,6 +3,11 @@ package com.easyshop.auth.exception;
 import com.easyshop.auth.model.dto.error.ErrorResponse;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
+import java.sql.SQLException;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.env.Environment;
 import org.springframework.dao.DataAccessException;
@@ -18,11 +23,6 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
-
-import java.sql.SQLException;
-import java.util.Arrays;
-import java.util.LinkedHashMap;
-import java.util.Map;
 
 /**
  * Centralized exception handler for all application errors.
@@ -87,7 +87,6 @@ public class GlobalExceptionHandler {
 
         return switch (field) {
             case "email" -> switch (constraintCode) {
-                case "UniqueEmail" -> ErrorCode.EMAIL_ALREADY_USED.name();
                 case "Email" -> ErrorCode.EMAIL_INVALID.name();
                 case "NotBlank" -> ErrorCode.EMAIL_REQUIRED.name();
                 default -> ErrorCode.FIELD_INVALID.name();
@@ -96,6 +95,11 @@ public class GlobalExceptionHandler {
                 case "Pattern" -> ErrorCode.PASSWORD_WEAK.name();
                 case "NotBlank" -> ErrorCode.PASSWORD_REQUIRED.name();
                 default -> ErrorCode.PASSWORD_INVALID.name();
+            };
+            case "confirmPassword" -> switch (constraintCode) {
+                case "NotBlank" -> ErrorCode.PASSWORD_REQUIRED.name();
+                case "Pattern" -> ErrorCode.PASSWORD_INVALID.name();
+                default -> ErrorCode.PASSWORDS_DO_NOT_MATCH.name();
             };
             default -> ErrorCode.FIELD_INVALID.name();
         };
@@ -121,7 +125,7 @@ public class GlobalExceptionHandler {
 
         // Add retry-after for rate limit exceptions
         if (ex instanceof RateLimitExceededException rateLimitEx) {
-            builder.retryAfterSeconds(rateLimitEx.getRetryAfterSeconds());
+            builder.retryAfterSeconds((long) rateLimitEx.getRetryAfterSeconds());
         }
 
         ErrorResponse response = builder.build();
@@ -334,6 +338,7 @@ public class GlobalExceptionHandler {
      * Checks if application is running in development mode.
      */
     private boolean isDevelopmentMode() {
-        return Arrays.asList(environment.getActiveProfiles()).contains("dev");
+        Set<String> active = Set.of(environment.getActiveProfiles());
+        return active.contains("dev") || active.contains("local");
     }
 }

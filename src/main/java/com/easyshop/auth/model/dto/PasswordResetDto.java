@@ -12,24 +12,28 @@ import lombok.Setter;
 @NoArgsConstructor
 public class PasswordResetDto {
 
+    private static final String PASSWORD_COMPLEXITY_REGEX = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[@$!%*?&])[A-Za-z\\d@$!%*?&]{8,}$";
+    private static final String MESSAGE = "Password must be at least 8 characters long and contain at least one uppercase letter," +
+                    " one lowercase letter, one digit, and one special character (@$!%*?&)";
+
     @Email
     @NotBlank
     private String email;
 
     @NotBlank
     @Pattern(
-            regexp = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[@$!%*?&])[A-Za-z\\d@$!%*?&]{8,}$",
-            message = "Password must be at least 8 characters long and contain at least one uppercase letter," +
-                    " one lowercase letter, one digit, and one special character (@$!%*?&)"
+            regexp = PASSWORD_COMPLEXITY_REGEX,
+            message = MESSAGE
     )
     private String password;
 
     @NotBlank
-    @NotBlank
     @Pattern(
-            regexp = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[@$!%*?&])[A-Za-z\\d@$!%*?&]{8,}$",
-            message = "Password must be at least 8 characters long and contain at least one uppercase letter," +
-                    " one lowercase letter, one digit, and one special character (@$!%*?&)"
+            regexp = PASSWORD_COMPLEXITY_REGEX,
+            message = MESSAGE
     )
     private String confirmPassword;
+
+    @NotBlank
+    private String resetToken;
 }

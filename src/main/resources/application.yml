@@ -46,8 +46,15 @@ easyshop:
     verification-ttl-minutes: ${VERIFICATION_TTL_MINUTES:10}
     verification-max-attempts: ${VERIFICATION_MAX_ATTEMPTS:3}
     verification-resend-cooldown-seconds: ${VERIFICATION_RESEND_COOLDOWN_SECONDS:120}
+    reset-token-ttl-minutes: ${RESET_TOKEN_TTL_MINUTES:10}
+    trusted-proxies: ${EASYSHOP_TRUSTED_PROXIES:127.0.0.1,::1,0:0:0:0:0:0:0:1}
 
     # IP-based rate limiting
     verification-ip-rate-limit-enabled: ${VERIFICATION_IP_RATE_LIMIT_ENABLED:true}
     verification-ip-max-attempts: ${VERIFICATION_IP_MAX_ATTEMPTS:10}
     verification-ip-window-minutes: ${VERIFICATION_IP_WINDOW_MINUTES:60}
+
+    rate-limit:
+      window-seconds: ${AUTH_RATE_LIMIT_WINDOW_SECONDS:600}
+      max-requests: ${AUTH_RATE_LIMIT_MAX_REQUESTS:10}
+      paths: ${AUTH_RATE_LIMIT_PATHS:/api/auth/send-verification-code,/api/auth/verify-code,/api/auth/reset-password,/api/auth/register}

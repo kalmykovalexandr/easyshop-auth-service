@@ -1,6 +1,5 @@
 package com.easyshop.auth.model.dto;
 
-import com.easyshop.auth.validation.UniqueEmail;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
@@ -14,7 +13,6 @@ public class AuthDto {
 
     @Email
     @NotBlank
-    @UniqueEmail
     private String email;
 
     @NotBlank

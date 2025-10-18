@@ -1,4 +1,4 @@
-﻿CREATE TABLE IF NOT EXISTS auth.email_verification_token (
+CREATE TABLE IF NOT EXISTS auth.email_verification_token (
     id BIGSERIAL PRIMARY KEY,
     token VARCHAR(255) NOT NULL UNIQUE,
     user_id BIGINT NOT NULL REFERENCES auth."user"(id) ON DELETE CASCADE,
