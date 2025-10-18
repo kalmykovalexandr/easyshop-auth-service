@@ -1,5 +1,7 @@
 package com.easyshop.auth.service.impl;
 
+import com.easyshop.auth.exception.BusinessException;
+import com.easyshop.auth.exception.ErrorCode;
 import com.easyshop.auth.service.EmailServiceInt;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
@@ -17,18 +19,18 @@ import org.thymeleaf.context.Context;
 import java.io.UnsupportedEncodingException;
 import java.util.Locale;
 
-
 @Slf4j
 @Service
 public class EmailService implements EmailServiceInt {
 
-    @Value("${easyshop.mail.from-email}") String fromEmail;
-    @Value("${easyshop.mail.from-name}") String fromName;
+    @Value("${easyshop.mail.from-email}")
+    String fromEmail;
+    @Value("${easyshop.mail.from-name}")
+    String fromName;
 
     private final JavaMailSender mailSender;
     private final TemplateEngine templateEngine;
     private final MessageSource messageSource;
-    private final Locale locale = LocaleContextHolder.getLocale();
 
     public EmailService(JavaMailSender mailSender,
                         TemplateEngine templateEngine,
@@ -40,6 +42,7 @@ public class EmailService implements EmailServiceInt {
 
     @Override
     public void sendVerificationEmail(String email, String otpCode) {
+        Locale locale = LocaleContextHolder.getLocale();
         try {
             String subject = messageSource.getMessage("email.verification.subject", null, locale);
 
@@ -56,9 +59,9 @@ public class EmailService implements EmailServiceInt {
             helper.setText(content, true);
 
             mailSender.send(message);
-
         } catch (MailException | MessagingException | UnsupportedEncodingException e) {
             log.error("Failed to send verification email to: {}", email, e);
+            throw new BusinessException(ErrorCode.EMAIL_SEND_ERROR, e);
         }
     }
 }

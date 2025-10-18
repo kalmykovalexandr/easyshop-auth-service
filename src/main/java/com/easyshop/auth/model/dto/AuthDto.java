@@ -1,7 +1,9 @@
 package com.easyshop.auth.model.dto;
 
 import com.easyshop.auth.validation.UniqueEmail;
-import jakarta.validation.constraints.*;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import lombok.Getter;
 
 import java.util.Locale;
@@ -13,7 +15,7 @@ public class AuthDto {
     @Email
     @NotBlank
     @UniqueEmail
-    private final String email;
+    private String email;
 
     @NotBlank
     @Pattern(
@@ -21,7 +23,7 @@ public class AuthDto {
         message = "Password must be at least 8 characters long and contain at least one uppercase letter," +
                 " one lowercase letter, one digit, and one special character (@$!%*?&)"
     )
-    private final String password;
+    private String password;
 
     public AuthDto(String email, String password) {
         this.email = email != null ? email.trim().toLowerCase(Locale.ROOT) : "";

@@ -1,4 +1,4 @@
-(function () {
+﻿(function () {
   const root = document.querySelector('[data-auth-root]')
   if (!root) {
     return
@@ -627,7 +627,7 @@
       registerForm.setAttribute('aria-hidden', 'true')
       registerForm.style.display = 'none'
     }
-    // вместо финальной модалки показываем OTP ввод
+
     if (otpModal) {
       otpModal.hidden = false
       otpModal.setAttribute('aria-hidden', 'false')
@@ -663,25 +663,22 @@
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify({ email: lastSubmittedEmail, code: raw })
       })
+      const payload = await resp.json().catch(() => null)
       if (!resp.ok) {
-        const payload = await resp.json().catch(() => null)
-        const status = payload && payload.status
+        const status = payload && typeof payload.status === 'string' ? payload.status.toUpperCase() : ''
 
-        // Handle TOO_MANY_ATTEMPTS: delete code, show message with resend option
         if (status === 'TOO_MANY_ATTEMPTS') {
           const msg = (payload && payload.detail) || 'Too many incorrect attempts. Please request a new code.'
           if (otpFeedback) {
             otpFeedback.textContent = msg
             otpFeedback.classList.add('auth-success__feedback--error')
           }
-          // Clear the input so user knows code is invalidated
           if (otpInput) {
             otpInput.value = ''
           }
           return
         }
 
-        // Handle other errors
         const msg = (payload && (payload.detail || payload.message)) || 'Invalid code.'
         if (otpFeedback) {
           otpFeedback.textContent = msg
@@ -689,7 +686,16 @@
         }
         return
       }
-      // успех: показать финальную модалку
+
+      const status = payload && typeof payload.status === 'string' ? payload.status.toUpperCase() : 'VERIFIED'
+      if (status !== 'VERIFIED') {
+        if (otpFeedback) {
+          otpFeedback.textContent = 'Verification failed. Please request a new code.'
+          otpFeedback.classList.add('auth-success__feedback--error')
+        }
+        return
+      }
+
       if (otpModal) {
         otpModal.hidden = true
         otpModal.setAttribute('aria-hidden', 'true')
@@ -756,7 +762,7 @@
           'Content-Type': 'application/json',
           Accept: 'application/json'
         },
-        body: JSON.stringify({ email: lastSubmittedEmail })
+        body: JSON.stringify({ email: lastSubmittedEmail, purpose: 'REGISTRATION' })
       })
 
       if (!response.ok) {
@@ -985,6 +991,7 @@
   const resetPasswordFeedback = resetPasswordModal?.querySelector('[data-reset-password-feedback]')
 
   let resetEmail = ''
+  let resetToken = ''
 
   function hideAllResetModals() {
     ;[forgotPasswordModal, resetOtpModal, resetPasswordModal, resetSuccessModal].forEach(modal => {
@@ -1028,6 +1035,7 @@
       resetEmailInput?.focus()
       clearResetFeedback(forgotFeedback)
       if (resetEmailInput) resetEmailInput.value = ''
+      resetToken = ''
     })
   })
 
@@ -1042,12 +1050,13 @@
 
     clearResetFeedback(forgotFeedback)
     resetEmail = email
+    resetToken = ''
 
     try {
       const response = await fetch('/api/auth/forgot-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify({ email })
+        body: JSON.stringify({ email, purpose: 'PASSWORD_RESET' })
       })
 
       if (!response.ok) {
@@ -1086,25 +1095,36 @@
       const response = await fetch('/api/auth/verify-code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify({ email: resetEmail, code, purpose: 'password_reset' })
+        body: JSON.stringify({ email: resetEmail, code, purpose: 'PASSWORD_RESET' })
       })
 
       const payload = await response.json().catch(() => null)
 
       if (!response.ok) {
+        resetToken = ''
         const message = (payload && payload.detail) || 'Invalid code. Please try again.'
         setResetFeedback(resetOtpFeedback, message, true)
         return
       }
 
-      if (payload && payload.status === 'VERIFIED') {
-        // Move to password reset form
-        showResetModal(resetPasswordModal)
-        if (newPasswordInput) newPasswordInput.value = ''
-        if (confirmPasswordInput) confirmPasswordInput.value = ''
-        clearResetFeedback(resetPasswordFeedback)
-        newPasswordInput?.focus()
+      const status = payload && typeof payload.status === 'string' ? payload.status.toUpperCase() : ''
+      if (status !== 'VERIFIED') {
+        resetToken = ''
+        setResetFeedback(resetOtpFeedback, 'Verification failed. Please request a new code.', true)
+        return
       }
+
+      resetToken = payload && typeof payload.resetToken === 'string' ? payload.resetToken : ''
+      if (!resetToken) {
+        setResetFeedback(resetOtpFeedback, 'Verification token missing. Please request a new code.', true)
+        return
+      }
+
+      showResetModal(resetPasswordModal)
+      if (newPasswordInput) newPasswordInput.value = ''
+      if (confirmPasswordInput) confirmPasswordInput.value = ''
+      clearResetFeedback(resetPasswordFeedback)
+      newPasswordInput?.focus()
     } catch (error) {
       setResetFeedback(resetOtpFeedback, 'Network error. Please try again.', true)
     }
@@ -1114,6 +1134,7 @@
   resetOtpModal?.querySelector('[data-action="back-to-forgot"]')?.addEventListener('click', () => {
     showResetModal(forgotPasswordModal)
     resetEmailInput?.focus()
+    resetToken = ''
   })
 
   // Step 3: Complete password reset
@@ -1138,11 +1159,16 @@
 
     clearResetFeedback(resetPasswordFeedback)
 
+    if (!resetToken) {
+      setResetFeedback(resetPasswordFeedback, 'Verification expired. Please request a new code.', true)
+      return
+    }
+
     try {
       const response = await fetch('/api/auth/reset-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify({ email: resetEmail, password: newPassword, confirmPassword })
+        body: JSON.stringify({ email: resetEmail, password: newPassword, confirmPassword, resetToken })
       })
 
       if (!response.ok) {
@@ -1154,6 +1180,7 @@
 
       // Show success modal
       showResetModal(resetSuccessModal)
+      resetToken = ''
     } catch (error) {
       setResetFeedback(resetPasswordFeedback, 'Network error. Please try again.', true)
     }
@@ -1170,5 +1197,8 @@
   })
 
 })()
+
+
+
 
 

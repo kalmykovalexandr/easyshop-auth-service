@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en" xmlns:th="http://www.thymeleaf.org" th:attr="lang=${#locale.language}">
 <head>
     <meta charset="UTF-8">
@@ -80,7 +80,7 @@
                     <button type="button" class="auth-button auth-button--secondary" data-action="cancel-forgot" th:text="#{password.forgot.back}">Back to sign in</button>
                 </div>
                 <footer class="auth-footer">
-                    <p class="auth-footer__text" th:text="#{login.footer.copyright(${#temporals.year(#temporals.createNow())})}">© 2025 EasyShop. All rights reserved.</p>
+                    <p class="auth-footer__text" th:text="#{login.footer.copyright(${#temporals.year(#temporals.createNow())})}">(c) 2025 EasyShop. All rights reserved.</p>
                 </footer>
             </div>
 
@@ -99,7 +99,7 @@
                     <button type="button" class="auth-button auth-button--secondary" data-action="back-to-forgot" th:text="#{password.forgot.back}">Back</button>
                 </div>
                 <footer class="auth-footer">
-                    <p class="auth-footer__text" th:text="#{login.footer.copyright(${#temporals.year(#temporals.createNow())})}">© 2025 EasyShop. All rights reserved.</p>
+                    <p class="auth-footer__text" th:text="#{login.footer.copyright(${#temporals.year(#temporals.createNow())})}">(c) 2025 EasyShop. All rights reserved.</p>
                 </footer>
             </div>
 
@@ -139,7 +139,7 @@
                     <button type="button" class="auth-button" data-action="complete-reset" th:text="#{password.reset.submit}">Reset Password</button>
                 </div>
                 <footer class="auth-footer">
-                    <p class="auth-footer__text" th:text="#{login.footer.copyright(${#temporals.year(#temporals.createNow())})}">© 2025 EasyShop. All rights reserved.</p>
+                    <p class="auth-footer__text" th:text="#{login.footer.copyright(${#temporals.year(#temporals.createNow())})}">(c) 2025 EasyShop. All rights reserved.</p>
                 </footer>
             </div>
 
@@ -153,12 +153,12 @@
                     <button type="button" class="auth-button" data-action="show-signin" th:text="#{password.reset.complete.button}">Sign In Now</button>
                 </div>
                 <footer class="auth-footer">
-                    <p class="auth-footer__text" th:text="#{login.footer.copyright(${#temporals.year(#temporals.createNow())})}">© 2025 EasyShop. All rights reserved.</p>
+                    <p class="auth-footer__text" th:text="#{login.footer.copyright(${#temporals.year(#temporals.createNow())})}">(c) 2025 EasyShop. All rights reserved.</p>
                 </footer>
             </div>
 
             <footer class="auth-footer">
-                <p class="auth-footer__text" th:text="#{login.footer.copyright(${#temporals.year(#temporals.createNow())})}">© 2025 EasyShop. All rights reserved.</p>
+                <p class="auth-footer__text" th:text="#{login.footer.copyright(${#temporals.year(#temporals.createNow())})}">(c) 2025 EasyShop. All rights reserved.</p>
             </footer>
         </section>
 
@@ -232,7 +232,7 @@
                     <a class="auth-button auth-button--secondary" data-action="go-home" th:href="@{/}" th:text="#{auth.email.verified.button.store}">Go to Store</a>
                 </div>
                 <footer class="auth-footer">
-                    <p class="auth-footer__text" th:text="#{login.footer.copyright(${#temporals.year(#temporals.createNow())})}">© 2025 EasyShop. All rights reserved.</p>
+                    <p class="auth-footer__text" th:text="#{login.footer.copyright(${#temporals.year(#temporals.createNow())})}">(c) 2025 EasyShop. All rights reserved.</p>
                 </footer>
             </div>
 
@@ -240,7 +240,7 @@
             <div class="auth-success" data-otp-modal hidden aria-hidden="true">
                 <div class="auth-success__status">
                     <h2 class="auth-success__title" th:text="#{auth.email.verified.title}">Email Verified!</h2>
-                    <p class="auth-success__message" th:text="#{login.register.modal.messageOtp}">Enter the 8-digit code we sent to your e‑mail.</p>
+                    <p class="auth-success__message" th:text="#{login.register.modal.messageOtp}">Enter the 8-digit code we sent to your email.</p>
                     <label class="auth-field">
                         <input class="auth-field__input" type="text" inputmode="numeric" pattern="[0-9]{8}" maxlength="8" placeholder="12345678" data-otp-input>
                     </label>
@@ -251,7 +251,7 @@
                     <a class="auth-button auth-button--secondary" data-action="resend-verification" href="#" th:text="#{login.register.modal.resend}">Send again</a>
                 </div>
                 <footer class="auth-footer">
-                    <p class="auth-footer__text" th:text="#{login.footer.copyright(${#temporals.year(#temporals.createNow())})}">© 2025 EasyShop. All rights reserved.</p>
+                    <p class="auth-footer__text" th:text="#{login.footer.copyright(${#temporals.year(#temporals.createNow())})}">(c) 2025 EasyShop. All rights reserved.</p>
                 </footer>
             </div>
 
@@ -268,14 +268,14 @@
                     <a class="auth-button auth-button--secondary" data-action="go-home" th:href="@{/}" th:text="#{login.register.modal.home}">Go to store</a>
                 </div>
                 <footer class="auth-footer">
-                    <p class="auth-footer__text" th:text="#{login.footer.copyright(${#temporals.year(#temporals.createNow())})}">© 2025 EasyShop. All rights reserved.</p>
+                    <p class="auth-footer__text" th:text="#{login.footer.copyright(${#temporals.year(#temporals.createNow())})}">(c) 2025 EasyShop. All rights reserved.</p>
                 </footer>
             </div>
 
             <p class="auth-note" th:text="#{login.register.footer}">By submitting the form you agree to the privacy policy.</p>
 
             <footer class="auth-footer">
-                <p class="auth-footer__text" th:text="#{login.footer.copyright(${#temporals.year(#temporals.createNow())})}">© 2025 EasyShop. All rights reserved.</p>
+                <p class="auth-footer__text" th:text="#{login.footer.copyright(${#temporals.year(#temporals.createNow())})}">(c) 2025 EasyShop. All rights reserved.</p>
             </footer>
         </section>
     </div>
@@ -283,3 +283,9 @@
 <script src="/js/login.js" defer></script>
 </body>
 </html>
+
+
+
+
+
+

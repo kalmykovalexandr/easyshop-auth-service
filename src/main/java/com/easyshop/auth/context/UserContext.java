@@ -10,6 +10,7 @@ import org.springframework.web.context.annotation.RequestScope;
 public class UserContext {
 
     private Locale locale;
+    private String clientIp;
 
     public Locale getLocale() {
         return locale;
@@ -32,5 +33,22 @@ public class UserContext {
             return false;
         }
         return Objects.equals(locale.getLanguage(), language);
+    }
+
+    public String getClientIp() {
+        return clientIp;
+    }
+
+    public void setClientIp(String clientIp) {
+        if (clientIp == null) {
+            this.clientIp = null;
+            return;
+        }
+        String trimmed = clientIp.trim();
+        this.clientIp = trimmed.isEmpty() ? null : trimmed;
+    }
+
+    public boolean hasClientIp() {
+        return clientIp != null && !clientIp.isBlank();
     }
 }

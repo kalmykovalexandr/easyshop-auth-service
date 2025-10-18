@@ -25,6 +25,15 @@ public class UserContextInterceptor implements HandlerInterceptor {
                              @NonNull Object handler) {
         Locale locale = localeResolver.resolveLocale(request);
         userContext.setLocale(locale);
+        userContext.setClientIp(resolveClientIp(request));
         return true;
+    }
+
+    private String resolveClientIp(HttpServletRequest request) {
+        String forwarded = request.getHeader("X-Forwarded-For");
+        if (forwarded != null && !forwarded.isBlank()) {
+            return forwarded.split(",")[0].trim();
+        }
+        return request.getRemoteAddr();
     }
 }

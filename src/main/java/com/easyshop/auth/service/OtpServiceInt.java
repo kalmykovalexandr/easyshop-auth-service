@@ -1,6 +1,8 @@
 package com.easyshop.auth.service;
 
+import com.easyshop.auth.model.dto.VerifyCodeDto;
+
 public interface OtpServiceInt {
-    void generateOtp(String key);
-    boolean verifyOtp(String key, String code);
+    void generateOtp(String email);
+    void verifyOtp(VerifyCodeDto dto);
 }
