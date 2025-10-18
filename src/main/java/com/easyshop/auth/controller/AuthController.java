@@ -11,9 +11,10 @@ import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-
-import java.util.Map;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 @Slf4j
 @RestController
@@ -36,13 +37,13 @@ public class AuthController {
     }
 
     @PostMapping(value = "/send-verification-code", consumes = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<Void> sendVerificationCode(@RequestParam OtpSendDto dto) {
+    public ResponseEntity<Void> sendVerificationCode(@Valid @RequestBody OtpSendDto dto) {
         otpService.generateOtp(dto.getEmail());
         return ResponseEntity.accepted().build();
     }
 
     @PostMapping(value = "/verify-code", consumes = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<Map<String, Object>> verifyCode(@Valid @RequestBody VerifyCodeDto dto) {
+    public ResponseEntity<Void> verifyCode(@Valid @RequestBody VerifyCodeDto dto) {
         otpService.verifyOtp(dto);
         return ResponseEntity.accepted().build();
     }
