@@ -122,6 +122,17 @@ body.auth-modal-open {
   box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.18);
 }
 
+.auth-field__input[type="password"]::-ms-reveal,
+.auth-field__input[type="password"]::-ms-clear {
+  display: none;
+}
+
+.auth-field__input[type="password"]::-webkit-credentials-auto-fill-button,
+.auth-field__input[type="password"]::-webkit-textfield-decoration-container,
+.auth-field__input[type="password"]::-webkit-password-toggle-button {
+  display: none;
+}
+
 .auth-field__input--otp {
   text-align: center;
   font-size: 1.25rem;
@@ -139,39 +150,36 @@ body.auth-modal-open {
   top: 50%;
   transform: translateY(-50%);
   border: none;
-  background: transparent;
+  background: none;
   padding: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   color: #6b7280;
+  transition: color 0.2s ease;
 }
 
-.auth-field__toggle:hover {
+.auth-field__toggle:hover,
+.auth-field__toggle:focus-visible {
   color: #4f46e5;
 }
 
+.auth-field__toggle--hidden {
+  display: none;
+}
+
 .auth-field__toggle-icon {
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  border: 2px solid currentColor;
-  position: relative;
+  width: 24px;
+  height: 24px;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 24px 24px;
+  background-image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIGZpbGw9Im5vbmUiIHN0cm9rZT0iY3VycmVudENvbG9yIiBzdHJva2Utd2lkdGg9IjEuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIiB2aWV3Qm94PSIwIDAgMjQgMjQiPjxwYXRoIGQ9Ik0yIDEyczQtNyAxMC03IDEwIDcgMTAgNy00IDctMTAgN1MyIDEyIDIgMTJaIi8+PGNpcmNsZSBjeD0iMTIiIGN5PSIxMiIgcj0iMyIvPjwvc3ZnPg==");
 }
 
-.auth-field__toggle-icon::after {
-  content: "";
-  position: absolute;
-  inset: 4px;
-  border-radius: 50%;
-  background: currentColor;
-  opacity: 0;
-  transition: opacity 0.2s ease;
-}
-
-.auth-field__toggle-icon--active::after {
-  opacity: 0.9;
+.auth-field__toggle-icon--active {
+  background-image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIGZpbGw9Im5vbmUiIHN0cm9rZT0iY3VycmVudENvbG9yIiBzdHJva2Utd2lkdGg9IjEuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIiB2aWV3Qm94PSIwIDAgMjQgMjQiPjxwYXRoIGQ9Ik0yIDEyczQtNyAxMC03IDEwIDcgMTAgNy00IDctMTAgN1MyIDEyIDIgMTJaIi8+PGNpcmNsZSBjeD0iMTIiIGN5PSIxMiIgcj0iMyIvPjxwYXRoIGQ9Ik00IDRsMTYgMTYiLz48L3N2Zz4=");
 }
 
 .auth-button {

@@ -177,8 +177,29 @@
     }
   }
 
-  root.querySelectorAll('[data-toggle-password]').forEach((button) => {
-    button.addEventListener('click', () => togglePasswordVisibility(button))
+  const passwordToggles = Array.from(root.querySelectorAll('[data-toggle-password]'))
+
+  passwordToggles.forEach((button) => {
+    const input = button?.parentElement?.querySelector('input')
+    if (!input) {
+      button.classList.add('auth-field__toggle--hidden')
+      return
+    }
+
+    const updateToggleVisibility = () => {
+      const hasValue = Boolean(input.value && input.value.length > 0)
+      button.classList.toggle('auth-field__toggle--hidden', !hasValue)
+    }
+
+    input.addEventListener('input', updateToggleVisibility)
+    input.addEventListener('change', updateToggleVisibility)
+    updateToggleVisibility()
+
+    button.addEventListener('click', (event) => {
+      event.preventDefault()
+      togglePasswordVisibility(button)
+      input.focus()
+    })
   })
 
   function showMessage(container, text, type = 'error') {
@@ -271,18 +292,8 @@
         return
       }
 
-      try {
-        const { response, payload } = await fetchJson('/api/auth/register', {
-          method: 'POST',
-          body: JSON.stringify({ email, password, confirmPassword })
-        })
-
-        if (!response.ok) {
-          const message = (payload && payload.detail) || registerForm.dataset.errorGeneric || getMessage('genericError', 'Could not create the account.')
-          showMessage(registerError, message)
-          return
-        }
-
+      let otpModalOpened = false
+      if (otpModal) {
         registerEmail = email
         if (otpDescription) {
           const template = otpDescription.dataset.template || otpDescription.textContent || ''
@@ -293,7 +304,42 @@
         }
         clearMessage(otpMessage)
         openModal(otpModal)
+        otpModalOpened = true
+      }
+
+      try {
+        const { response, payload } = await fetchJson('/api/auth/register', {
+          method: 'POST',
+          body: JSON.stringify({ email, password, confirmPassword })
+        })
+
+        if (!response.ok) {
+          if (otpModalOpened) {
+            closeModal(otpModal)
+            registerEmail = ''
+          }
+          const message = (payload && payload.detail) || registerForm.dataset.errorGeneric || getMessage('genericError', 'Could not create the account.')
+          showMessage(registerError, message)
+          return
+        }
+
+        if (!otpModalOpened && otpModal) {
+          registerEmail = email
+          if (otpDescription) {
+            const template = otpDescription.dataset.template || otpDescription.textContent || ''
+            otpDescription.textContent = format(template, registerEmail)
+          }
+          if (otpInput) {
+            otpInput.value = ''
+          }
+          clearMessage(otpMessage)
+          openModal(otpModal)
+        }
       } catch (error) {
+        if (otpModalOpened) {
+          closeModal(otpModal)
+          registerEmail = ''
+        }
         showMessage(registerError, registerForm.dataset.errorGeneric || getMessage('genericError', 'Something went wrong. Try again later.'))
       }
     })
@@ -358,7 +404,7 @@
           return
         }
         showMessage(otpMessage, getMessage('otpResendSuccess', 'We sent a new code.'), 'success')
-        startCooldown(button, response.headers.get('Retry-After'))
+        startCooldown(button, Number(response.headers.get('Retry-After')))
       } catch (error) {
         showMessage(otpMessage, getMessage('otpError', 'Could not resend the code. Try later.'))
       }
@@ -373,13 +419,36 @@
         showMessage(forgotEmailMessage, getMessage('forgotEmailError', 'Enter a valid e-mail.'))
         return
       }
+      forgotEmailInput && (forgotEmailInput.value = email)
+
+      let codeModalOpened = false
+      if (forgotCodeModal) {
+        forgotEmail = email
+        if (forgotCodeDescription) {
+          const template = forgotCodeDescription.dataset.template || forgotCodeDescription.textContent || ''
+          forgotCodeDescription.textContent = format(template, email)
+        }
+        if (forgotCodeInput) {
+          forgotCodeInput.value = ''
+        }
+        clearMessage(forgotCodeMessage)
+        openModal(forgotCodeModal)
+        codeModalOpened = true
+      }
+
       try {
         const { response, payload } = await fetchJson('/api/auth/send-verification-code', {
           method: 'POST',
           body: JSON.stringify({ email })
         })
         if (!response.ok) {
+          if (codeModalOpened) {
+            closeModal(forgotCodeModal)
+          }
+          forgotEmail = ''
           const retryAfter = response.headers.get('Retry-After')
+          openModal(forgotEmailModal)
+          forgotEmailInput && (forgotEmailInput.value = email)
           if (response.status === 429 && retryAfter) {
             showMessage(forgotEmailMessage, getMessage('otpResendWait', 'Please wait {0} seconds before requesting again.').replace('{0}', retryAfter))
             return
@@ -389,15 +458,25 @@
           return
         }
 
-        forgotEmail = email
-        if (forgotCodeDescription) {
-          const template = forgotCodeDescription.dataset.template || forgotCodeDescription.textContent || ''
-          forgotCodeDescription.textContent = format(template, email)
+        if (!codeModalOpened && forgotCodeModal) {
+          forgotEmail = email
+          if (forgotCodeDescription) {
+            const template = forgotCodeDescription.dataset.template || forgotCodeDescription.textContent || ''
+            forgotCodeDescription.textContent = format(template, email)
+          }
+          if (forgotCodeInput) {
+            forgotCodeInput.value = ''
+          }
+          clearMessage(forgotCodeMessage)
+          openModal(forgotCodeModal)
         }
-        forgotCodeInput && (forgotCodeInput.value = '')
-        clearMessage(forgotCodeMessage)
-        openModal(forgotCodeModal)
       } catch (error) {
+        if (codeModalOpened) {
+          closeModal(forgotCodeModal)
+        }
+        forgotEmail = ''
+        openModal(forgotEmailModal)
+        forgotEmailInput && (forgotEmailInput.value = email)
         showMessage(forgotEmailMessage, getMessage('genericError', 'Could not send the code.'))
       }
     })
@@ -457,7 +536,7 @@
           const retryAfter = response.headers.get('Retry-After')
           if (response.status === 429 && retryAfter) {
             showMessage(forgotCodeMessage, getMessage('otpResendWait', 'Please wait {0} seconds before requesting again.').replace('{0}', retryAfter))
-            startCooldown(button, retryAfter)
+            startCooldown(button, Number(retryAfter))
             return
           }
           const message = (payload && payload.detail) || getMessage('genericError', 'Could not resend the code.')
@@ -465,7 +544,7 @@
           return
         }
         showMessage(forgotCodeMessage, getMessage('otpResendSuccess', 'We sent a new code.'), 'success')
-        startCooldown(button, response.headers.get('Retry-After'))
+        startCooldown(button, Number(response.headers.get('Retry-After')))
       } catch (error) {
         showMessage(forgotCodeMessage, getMessage('genericError', 'Could not resend the code.'))
       }
