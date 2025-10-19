@@ -1,13 +1,13 @@
 package com.easyshop.auth.config;
 
 import com.easyshop.auth.context.UserContextInterceptor;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.Locale;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.MessageSource;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.support.ReloadableResourceBundleMessageSource;
+import org.springframework.context.support.ResourceBundleMessageSource;
 import org.springframework.web.servlet.LocaleResolver;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
@@ -36,16 +36,17 @@ public class WebConfig implements WebMvcConfigurer {
         resolver.setCookieName("easyshop-lang");
         resolver.setCookiePath("/");
         resolver.setCookieMaxAge((int) Duration.ofDays(365).getSeconds());
-        resolver.setDefaultLocale(null);
+        resolver.setDefaultLocale(Locale.forLanguageTag("ru"));
         return resolver;
     }
 
     @Bean
     public MessageSource messageSource() {
-        ReloadableResourceBundleMessageSource source = new ReloadableResourceBundleMessageSource();
-        source.setBasename("classpath:messages");
-        source.setDefaultEncoding(StandardCharsets.UTF_8.name());
-        source.setFallbackToSystemLocale(false);
-        return source;
+        ResourceBundleMessageSource messageSource = new ResourceBundleMessageSource();
+        messageSource.setBasename("messages");
+        messageSource.setDefaultEncoding("UTF-8");
+        messageSource.setFallbackToSystemLocale(false);
+        messageSource.setCacheSeconds(3600);
+        return messageSource;
     }
 }

@@ -1,22 +1,28 @@
 package com.easyshop.auth.model.dto;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
-import lombok.Getter;
-import lombok.Setter;
-
 import java.util.Locale;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 @Getter
-@Setter
+@NoArgsConstructor
 public class OtpSendDto {
 
     @Email
     @NotBlank
     private String email;
 
-    public OtpSendDto(String email) {
-        this.email = email != null ? email.trim().toLowerCase(Locale.ROOT) : "";
+    @JsonCreator
+    public OtpSendDto(@JsonProperty("email") String email) {
+        setEmail(email);
     }
 
+    @JsonProperty("email")
+    public void setEmail(String email) {
+        this.email = email != null ? email.trim().toLowerCase(Locale.ROOT) : "";
+    }
 }

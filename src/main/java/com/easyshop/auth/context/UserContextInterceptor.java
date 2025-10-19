@@ -37,7 +37,7 @@ public class UserContextInterceptor implements HandlerInterceptor {
         String remoteAddr = request.getRemoteAddr();
         if (isTrustedProxy(remoteAddr)) {
             String forwarded = request.getHeader("X-Forwarded-For");
-            if (!StringUtils.containsWhitespace(forwarded)) {
+            if (forwarded != null && !forwarded.isBlank() && !StringUtils.containsWhitespace(forwarded)) {
                 return forwarded.split(",")[0].trim();
             }
         }

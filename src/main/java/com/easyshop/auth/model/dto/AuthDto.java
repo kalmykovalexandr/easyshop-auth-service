@@ -1,12 +1,13 @@
 package com.easyshop.auth.model.dto;
 
+import java.util.Locale;
+
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import lombok.Getter;
-
-import java.util.Locale;
-
 
 @Getter
 public class AuthDto {
@@ -23,7 +24,9 @@ public class AuthDto {
     )
     private String password;
 
-    public AuthDto(String email, String password) {
+    @JsonCreator
+    public AuthDto(@JsonProperty("email") String email,
+                   @JsonProperty("password") String password) {
         this.email = email != null ? email.trim().toLowerCase(Locale.ROOT) : "";
         this.password = password;
     }

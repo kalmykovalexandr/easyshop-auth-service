@@ -1,291 +1,296 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en" xmlns:th="http://www.thymeleaf.org" th:attr="lang=${#locale.language}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title th:text="#{login.meta.title.signin}">EasyShop - Sign in</title>
+    <title th:text="#{login.meta.title.signin}">EasyShop · Sign in</title>
     <link rel="stylesheet" href="/css/login.css">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 </head>
 <body>
 <div class="auth-shell" data-auth-root>
-    <div class="auth-card" data-mode="signin"
+    <div class="auth-card"
+         data-mode="signin"
          th:attr="data-signin-title=#{login.meta.title.signin},
-                  data-register-title=#{login.meta.title.register}">
+                 data-register-title=#{login.meta.title.register}">
+
+        <!-- Sign in -->
         <section class="auth-view auth-view--signin" data-view="signin">
             <header class="auth-header">
                 <h1 class="auth-title" th:text="#{login.signin.title}">Sign in</h1>
-                <p class="auth-switch">
-                    <a href="#" data-action="show-register" th:text="#{login.signin.toggle}">Create Account</a>
-                </p>
+                <p class="auth-subtitle" th:text="#{login.signin.subtitle}">Welcome back! Enter your details to continue.</p>
             </header>
 
-            <form method="post" action="/login" class="auth-form" novalidate
-                th:attr="data-error-missing-email=#{login.form.error.missingEmail},
-                         data-error-missing-password=#{login.form.error.missingPassword}">
+            <form method="post"
+                  action="/login"
+                  class="auth-form"
+                  data-signin-form
+                  novalidate
+                  th:attr="data-error-email=#{login.errors.emailRequired},
+                           data-error-password=#{login.errors.passwordRequired}">
                 <label class="auth-field">
-                    <span class="auth-field__label" th:text="#{login.form.email}">E-mail</span>
+                    <span class="auth-field__label" th:text="#{login.field.email}">E-mail</span>
                     <input class="auth-field__input" type="email" name="username" autocomplete="username" required>
                 </label>
                 <label class="auth-field auth-field--with-toggle">
-                    <span class="auth-field__label" th:text="#{login.form.password}">Password</span>
+                    <span class="auth-field__label" th:text="#{login.field.password}">Password</span>
                     <div class="auth-field__control">
                         <input class="auth-field__input" type="password" name="password" autocomplete="current-password" required>
-                        <button type="button" class="auth-field__toggle" data-toggle-password
-                                th:attr="data-label-show=#{login.form.password.show},
-                                         data-label-hide=#{login.form.password.hide},
-                                         aria-label=#{login.form.password.show}">
+                        <button type="button"
+                                class="auth-field__toggle"
+                                data-toggle-password
+                                th:attr="data-label-show=#{login.password.toggle.show},
+                                         data-label-hide=#{login.password.toggle.hide},
+                                         aria-label=#{login.password.toggle.show}">
                             <span class="auth-field__toggle-icon" aria-hidden="true"></span>
-                            <span class="sr-only" th:text="#{login.form.password.show}">Show password</span>
+                            <span class="sr-only" th:text="#{login.password.toggle.show}">Show password</span>
                         </button>
                     </div>
                 </label>
-                <button type="submit" class="auth-button" th:text="#{login.form.submit}">Sign in</button>
-                <div class="auth-feedback auth-feedback--error"
-                 data-signin-feedback
-                 th:attr="hidden=${loginErrorCode} != null ? null : true, data-error-code=${loginErrorCode} ?: ''"
-                 th:text="${loginErrorCode} == null ? '' : (loginErrorCode == 'disabled' ? #{login.form.error.disabled} : #{login.form.error})">Invalid email or password. Try again.</div>
+                <div class="auth-message auth-message--error"
+                     data-signin-error
+                     th:if="${loginErrorCode} != null"
+                     th:text="${loginErrorCode} == 'disabled' ? #{login.errors.disabled} : #{login.errors.credentials}">
+                    Invalid e-mail or password.
+                </div>
+                <button type="submit" class="auth-button auth-button--primary" th:text="#{login.signin.submit}">Sign in</button>
             </form>
 
-            <div class="auth-divider" th:text="#{login.separator}">or</div>
-
-            <div class="auth-providers">
-                <button type="button" class="provider" aria-label="Google">
-                    <span class="provider__icon provider__icon--google" aria-hidden="true"></span>
-                </button>
-                <button type="button" class="provider" aria-label="Apple">
-                    <span class="provider__icon provider__icon--apple" aria-hidden="true"></span>
-                </button>
-                <button type="button" class="provider" aria-label="Facebook">
-                    <span class="provider__icon provider__icon--facebook" aria-hidden="true"></span>
-                </button>
+            <div class="auth-meta">
+                <button type="button" class="auth-link auth-link--action" data-action="open-forgot"
+                        th:text="#{login.actions.forgot}">Forgot password?</button>
             </div>
 
-            <a href="#" class="auth-link" data-action="show-forgot-password" th:text="#{login.forgot}">Forgot login?</a>
-            <p class="auth-note" th:text="#{login.notice}">Secure login. Google Terms & Privacy apply.</p>
+            <p class="auth-switch">
+                <span th:text="#{login.switch.noAccount}">Don’t have an account?</span>
+                <button type="button" class="auth-switch__btn" data-action="show-register"
+                        th:text="#{login.switch.create}">Create account</button>
+            </p>
 
-            <!-- Forgot Password Modal: Step 1 - Email Input -->
-            <div class="auth-success" data-forgot-password-modal hidden aria-hidden="true">
-                <div class="auth-success__status">
-                    <h2 class="auth-success__title" th:text="#{password.forgot.title}">Forgot Password?</h2>
-                    <p class="auth-success__message" th:text="#{password.forgot.description}">Enter your email address and we'll send you a verification code.</p>
-                    <label class="auth-field">
-                        <input class="auth-field__input" type="email" name="reset-email" autocomplete="email" placeholder="your@email.com" data-reset-email-input>
-                    </label>
-                </div>
-                <div class="auth-success__feedback" role="status" aria-live="polite" data-forgot-feedback></div>
-                <div class="auth-success__actions">
-                    <button type="button" class="auth-button" data-action="send-reset-code" th:text="#{password.forgot.submit}">Send Code</button>
-                    <button type="button" class="auth-button auth-button--secondary" data-action="cancel-forgot" th:text="#{password.forgot.back}">Back to sign in</button>
-                </div>
-                <footer class="auth-footer">
-                    <p class="auth-footer__text" th:text="#{login.footer.copyright(${#temporals.year(#temporals.createNow())})}">(c) 2025 EasyShop. All rights reserved.</p>
-                </footer>
-            </div>
-
-            <!-- Password Reset OTP Modal: Step 2 - Verify Code -->
-            <div class="auth-success" data-reset-otp-modal hidden aria-hidden="true">
-                <div class="auth-success__status">
-                    <h2 class="auth-success__title" th:text="#{password.reset.otp.title}">Enter Code</h2>
-                    <p class="auth-success__message" th:text="#{password.reset.otp.message}">Enter the 8-digit code we sent to your email.</p>
-                    <label class="auth-field">
-                        <input class="auth-field__input" type="text" inputmode="numeric" pattern="[0-9]{8}" maxlength="8" placeholder="12345678" data-reset-otp-input>
-                    </label>
-                </div>
-                <div class="auth-success__feedback" role="status" aria-live="polite" data-reset-otp-feedback></div>
-                <div class="auth-success__actions">
-                    <button type="button" class="auth-button" data-action="verify-reset-code" th:text="#{password.reset.otp.verify}">Verify Code</button>
-                    <button type="button" class="auth-button auth-button--secondary" data-action="back-to-forgot" th:text="#{password.forgot.back}">Back</button>
-                </div>
-                <footer class="auth-footer">
-                    <p class="auth-footer__text" th:text="#{login.footer.copyright(${#temporals.year(#temporals.createNow())})}">(c) 2025 EasyShop. All rights reserved.</p>
-                </footer>
-            </div>
-
-            <!-- Password Reset Form: Step 3 - New Password -->
-            <div class="auth-success" data-reset-password-modal hidden aria-hidden="true">
-                <div class="auth-success__status">
-                    <h2 class="auth-success__title" th:text="#{password.reset.form.title}">New Password</h2>
-                    <p class="auth-success__message" th:text="#{password.reset.form.description}">Enter your new password.</p>
-                    <label class="auth-field auth-field--with-toggle">
-                        <div class="auth-field__control">
-                            <input class="auth-field__input" type="password" name="new-password" autocomplete="new-password" placeholder="New password" data-new-password-input>
-                            <button type="button" class="auth-field__toggle" data-toggle-password
-                                    th:attr="data-label-show=#{login.form.password.show},
-                                             data-label-hide=#{login.form.password.hide},
-                                             aria-label=#{login.form.password.show}">
-                                <span class="auth-field__toggle-icon" aria-hidden="true"></span>
-                                <span class="sr-only" th:text="#{login.form.password.show}">Show password</span>
-                            </button>
-                        </div>
-                    </label>
-                    <label class="auth-field auth-field--with-toggle">
-                        <div class="auth-field__control">
-                            <input class="auth-field__input" type="password" name="confirm-new-password" autocomplete="new-password" placeholder="Confirm password" data-confirm-password-input>
-                            <button type="button" class="auth-field__toggle" data-toggle-password
-                                    th:attr="data-label-show=#{login.form.password.show},
-                                             data-label-hide=#{login.form.password.hide},
-                                             aria-label=#{login.form.password.show}">
-                                <span class="auth-field__toggle-icon" aria-hidden="true"></span>
-                                <span class="sr-only" th:text="#{login.form.password.show}">Show password</span>
-                            </button>
-                        </div>
-                    </label>
-                    <p class="auth-hint" th:text="#{login.form.requirements}">At least 8 characters...</p>
-                </div>
-                <div class="auth-success__feedback" role="status" aria-live="polite" data-reset-password-feedback></div>
-                <div class="auth-success__actions">
-                    <button type="button" class="auth-button" data-action="complete-reset" th:text="#{password.reset.submit}">Reset Password</button>
-                </div>
-                <footer class="auth-footer">
-                    <p class="auth-footer__text" th:text="#{login.footer.copyright(${#temporals.year(#temporals.createNow())})}">(c) 2025 EasyShop. All rights reserved.</p>
-                </footer>
-            </div>
-
-            <!-- Password Reset Success: Step 4 - Success -->
-            <div class="auth-success" data-reset-success-modal hidden aria-hidden="true">
-                <div class="auth-success__status">
-                    <h2 class="auth-success__title" th:text="#{password.reset.complete.title}">Password Reset!</h2>
-                    <p class="auth-success__message" th:text="#{password.reset.complete.success}">Your password has been reset successfully.</p>
-                </div>
-                <div class="auth-success__actions">
-                    <button type="button" class="auth-button" data-action="show-signin" th:text="#{password.reset.complete.button}">Sign In Now</button>
-                </div>
-                <footer class="auth-footer">
-                    <p class="auth-footer__text" th:text="#{login.footer.copyright(${#temporals.year(#temporals.createNow())})}">(c) 2025 EasyShop. All rights reserved.</p>
-                </footer>
-            </div>
-
-            <footer class="auth-footer">
-                <p class="auth-footer__text" th:text="#{login.footer.copyright(${#temporals.year(#temporals.createNow())})}">(c) 2025 EasyShop. All rights reserved.</p>
-            </footer>
+            <p class="auth-note" th:text="#{login.notice}">By continuing you agree to the Terms of Service.</p>
         </section>
 
+        <!-- Registration -->
         <section class="auth-view auth-view--register" data-view="register" hidden aria-hidden="true">
             <header class="auth-header">
-                <h1 class="auth-title"
-                th:attr="data-title-default=#{login.register.titleShort}, data-title-success=#{login.register.titleSuccess}"
-                th:text="#{login.register.titleShort}">Create your account</h1>
-                <p class="auth-switch">
-                    <a href="#" data-action="show-signin" th:text="#{login.register.toggle}">Back to sign in</a>
-                </p>
+                <h1 class="auth-title" th:text="#{register.title}">Create account</h1>
+                <p class="auth-subtitle" th:text="#{register.subtitle}">Let’s get you set up. It only takes a minute.</p>
             </header>
 
-            <form id="register-form" class="auth-form" novalidate
-                  th:attr="data-success-template=#{login.register.success},
-                           data-success-fallback=#{auth.register.success},
-                           data-error-generic=#{login.register.error.generic},
-                           data-error-network=#{login.register.error.network},
-                           data-error-mismatch=#{login.register.error.mismatch},
-                           data-error-empty=#{login.register.error.empty},
-                           data-error-email=#{login.register.error.email},
-                           data-error-password=#{login.register.error.password},
-                           data-resend-url=@{/api/auth/resend-verification-code},
-                           data-home-url=@{/},
-                           data-resend-success=#{login.register.modal.resendSuccess},
-                           data-resend-error=#{login.register.modal.resendError},
-                           data-resend-cooldown=#{login.register.modal.resendCooldown}">
+            <form class="auth-form"
+                  id="registerForm"
+                  data-register-form
+                  novalidate
+                  th:attr="data-error-email=#{register.errors.email},
+                           data-error-password=#{register.errors.password},
+                           data-error-mismatch=#{register.errors.mismatch},
+                           data-error-generic=#{register.errors.generic},
+                           data-success-title=#{register.success.title},
+                           data-success-message=#{register.success.message}">
                 <label class="auth-field">
-                    <span class="auth-field__label" th:text="#{login.form.email}">E-mail</span>
+                    <span class="auth-field__label" th:text="#{login.field.email}">E-mail</span>
                     <input class="auth-field__input" type="email" name="email" autocomplete="email" required>
                 </label>
                 <label class="auth-field auth-field--with-toggle">
-                    <span class="auth-field__label" th:text="#{login.form.password}">Password</span>
+                    <span class="auth-field__label" th:text="#{login.field.password}">Password</span>
                     <div class="auth-field__control">
                         <input class="auth-field__input" type="password" name="password" autocomplete="new-password" required>
-                        <button type="button" class="auth-field__toggle" data-toggle-password
-                                th:attr="data-label-show=#{login.form.password.show},
-                                         data-label-hide=#{login.form.password.hide},
-                                         aria-label=#{login.form.password.show}">
+                        <button type="button"
+                                class="auth-field__toggle"
+                                data-toggle-password
+                                th:attr="data-label-show=#{login.password.toggle.show},
+                                         data-label-hide=#{login.password.toggle.hide},
+                                         aria-label=#{login.password.toggle.show}">
                             <span class="auth-field__toggle-icon" aria-hidden="true"></span>
-                            <span class="sr-only" th:text="#{login.form.password.show}">Show password</span>
+                            <span class="sr-only" th:text="#{login.password.toggle.show}">Show password</span>
                         </button>
                     </div>
                 </label>
                 <label class="auth-field auth-field--with-toggle">
-                    <span class="auth-field__label" th:text="#{login.form.confirmPassword}">Confirm password</span>
+                    <span class="auth-field__label" th:text="#{login.field.confirmPassword}">Confirm password</span>
                     <div class="auth-field__control">
                         <input class="auth-field__input" type="password" name="confirmPassword" autocomplete="new-password" required>
-                        <button type="button" class="auth-field__toggle" data-toggle-password
-                                th:attr="data-label-show=#{login.form.password.show},
-                                         data-label-hide=#{login.form.password.hide},
-                                         aria-label=#{login.form.password.show}">
+                        <button type="button"
+                                class="auth-field__toggle"
+                                data-toggle-password
+                                th:attr="data-label-show=#{login.password.toggle.show},
+                                         data-label-hide=#{login.password.toggle.hide},
+                                         aria-label=#{login.password.toggle.show}">
                             <span class="auth-field__toggle-icon" aria-hidden="true"></span>
-                            <span class="sr-only" th:text="#{login.form.password.show}">Show password</span>
+                            <span class="sr-only" th:text="#{login.password.toggle.show}">Show password</span>
                         </button>
                     </div>
                 </label>
-                <p class="auth-hint" th:text="#{login.form.requirements}">At least 8 characters, upper and lower case letters, a number and one of @$!%*?&.</p>
-                <button type="submit" class="auth-button auth-button--ghost" th:text="#{login.register.submit}">Create account</button>
-                <div class="auth-feedback" data-feedback></div>
+                <p class="auth-hint" th:text="#{register.password.hint}">Use at least 8 characters with uppercase, lowercase, number and symbol.</p>
+                <div class="auth-message auth-message--error" data-register-error hidden aria-hidden="true"></div>
+                <button type="submit" class="auth-button auth-button--primary" th:text="#{register.submit}">Create account</button>
             </form>
 
-            <!-- Email verification success modal -->
-            <div class="auth-success" data-register-success th:if="${showEmailVerified == true}" th:classappend="${(showEmailVerified == true) ? '' : 'hidden'}" th:attr="aria-hidden=${(showEmailVerified == true) ? 'false' : 'true'}">
-                <div class="auth-success__status">
-                    <h2 class="auth-success__title" th:text="#{auth.email.verified.title}">Email Verified!</h2>
-                    <p class="auth-success__message" th:text="#{auth.email.verified.message}">Your email has been successfully verified. You can now sign in to your EasyShop account.</p>
-                </div>
-                <div class="auth-success__actions">
-                    <button type="button" class="auth-button" data-action="show-signin" th:text="#{auth.email.verified.button.signin}">Sign In</button>
-                    <a class="auth-button auth-button--secondary" data-action="go-home" th:href="@{/}" th:text="#{auth.email.verified.button.store}">Go to Store</a>
-                </div>
-                <footer class="auth-footer">
-                    <p class="auth-footer__text" th:text="#{login.footer.copyright(${#temporals.year(#temporals.createNow())})}">(c) 2025 EasyShop. All rights reserved.</p>
-                </footer>
-            </div>
+            <p class="auth-switch">
+                <span th:text="#{login.switch.haveAccount}">Already have an account?</span>
+                <button type="button" class="auth-switch__btn" data-action="show-signin"
+                        th:text="#{login.switch.signin}">Sign in</button>
+            </p>
 
-            <!-- OTP verification modal -->
-            <div class="auth-success" data-otp-modal hidden aria-hidden="true">
-                <div class="auth-success__status">
-                    <h2 class="auth-success__title" th:text="#{auth.email.verified.title}">Email Verified!</h2>
-                    <p class="auth-success__message" th:text="#{login.register.modal.messageOtp}">Enter the 8-digit code we sent to your email.</p>
-                    <label class="auth-field">
-                        <input class="auth-field__input" type="text" inputmode="numeric" pattern="[0-9]{8}" maxlength="8" placeholder="12345678" data-otp-input>
-                    </label>
-                </div>
-                <div class="auth-success__feedback" role="status" aria-live="polite" data-otp-feedback></div>
-                <div class="auth-success__actions">
-                    <button type="button" class="auth-button" data-action="submit-otp" th:text="#{login.register.modal.confirm}">Confirm</button>
-                    <a class="auth-button auth-button--secondary" data-action="resend-verification" href="#" th:text="#{login.register.modal.resend}">Send again</a>
-                </div>
-                <footer class="auth-footer">
-                    <p class="auth-footer__text" th:text="#{login.footer.copyright(${#temporals.year(#temporals.createNow())})}">(c) 2025 EasyShop. All rights reserved.</p>
-                </footer>
-            </div>
-
-            <!-- removed link-flow error modal -->
-
-            <!-- Regular registration success modal (hidden by default) -->
-            <div class="auth-success" data-register-success th:unless="${(showEmailVerified == true) or (showVerificationError == true)}" hidden aria-hidden="true">
-                <div class="auth-success__status">
-                    <p class="auth-success__message" data-success-message></p>
-                </div>
-                <div class="auth-success__feedback" role="status" aria-live="polite" data-success-feedback></div>
-                <div class="auth-success__actions">
-                    <button type="button" class="auth-button" data-action="show-signin" th:text="#{login.register.toggle}">Back to sign in</button>
-                    <a class="auth-button auth-button--secondary" data-action="go-home" th:href="@{/}" th:text="#{login.register.modal.home}">Go to store</a>
-                </div>
-                <footer class="auth-footer">
-                    <p class="auth-footer__text" th:text="#{login.footer.copyright(${#temporals.year(#temporals.createNow())})}">(c) 2025 EasyShop. All rights reserved.</p>
-                </footer>
-            </div>
-
-            <p class="auth-note" th:text="#{login.register.footer}">By submitting the form you agree to the privacy policy.</p>
-
-            <footer class="auth-footer">
-                <p class="auth-footer__text" th:text="#{login.footer.copyright(${#temporals.year(#temporals.createNow())})}">(c) 2025 EasyShop. All rights reserved.</p>
-            </footer>
+            <p class="auth-note" th:text="#{register.note}">By creating an account you agree to the privacy policy.</p>
         </section>
     </div>
 </div>
+
+<!-- OTP verification modal -->
+<section class="auth-modal" data-modal="otp" hidden aria-hidden="true">
+    <div class="auth-modal__dialog">
+        <button type="button" class="auth-modal__close" data-action="close-modal" aria-label="Close"></button>
+        <div class="auth-modal__body">
+            <h2 class="auth-modal__title" th:text="#{otp.modal.title}">Check your email</h2>
+            <p class="auth-modal__text"
+               data-otp-description
+               th:text="#{otp.modal.description}"
+               th:attr="data-template=#{otp.modal.description}">Enter the 8-digit code we sent to your email.</p>
+            <label class="auth-field auth-field--center">
+                <span class="auth-field__label sr-only" th:text="#{otp.modal.label}">Verification code</span>
+                <input class="auth-field__input auth-field__input--otp"
+                       type="text"
+                       inputmode="numeric"
+                       maxlength="8"
+                       data-otp-input
+                       th:attr="placeholder=#{otp.modal.placeholder}">
+            </label>
+            <div class="auth-message" data-otp-message hidden aria-hidden="true"></div>
+        </div>
+        <div class="auth-modal__actions">
+            <button type="button" class="auth-button auth-button--primary" data-action="otp-submit"
+                    th:text="#{otp.modal.confirm}">Confirm</button>
+            <button type="button" class="auth-button auth-button--secondary" data-action="otp-resend"
+                    th:text="#{otp.modal.resend}">Send again</button>
+        </div>
+    </div>
+</section>
+
+<!-- Registration success -->
+<section class="auth-modal" data-modal="register-success" hidden aria-hidden="true">
+    <div class="auth-modal__dialog">
+        <button type="button" class="auth-modal__close" data-action="close-modal" aria-label="Close"></button>
+        <div class="auth-modal__body auth-modal__body--center">
+            <div class="auth-modal__status auth-modal__status--success"></div>
+            <h2 class="auth-modal__title" th:text="#{register.success.titleShort}">Account confirmed</h2>
+            <p class="auth-modal__text" th:text="#{register.success.subtitle}">Your account is ready. Sign in to start shopping.</p>
+        </div>
+        <div class="auth-modal__actions">
+            <button type="button" class="auth-button auth-button--primary" data-action="go-signin"
+                    th:text="#{register.success.button.signin}">Sign in</button>
+            <a class="auth-button auth-button--secondary" data-action="go-home" th:href="@{/}"
+               th:text="#{register.success.button.store}">Go to store</a>
+        </div>
+    </div>
+</section>
+
+<!-- Forgot password step 1 -->
+<section class="auth-modal" data-modal="forgot-email" hidden aria-hidden="true">
+    <div class="auth-modal__dialog">
+        <button type="button" class="auth-modal__close" data-action="close-modal" aria-label="Close"></button>
+        <div class="auth-modal__body">
+            <h2 class="auth-modal__title" th:text="#{forgot.email.title}">Recover password</h2>
+            <p class="auth-modal__text" th:text="#{forgot.email.subtitle}">Enter your e-mail and we will send you a verification code.</p>
+            <label class="auth-field auth-field--center">
+                <span class="auth-field__label sr-only" th:text="#{login.field.email}">E-mail</span>
+                <input class="auth-field__input" type="email" data-forgot-email-input autocomplete="email">
+            </label>
+            <div class="auth-message" data-forgot-email-message hidden aria-hidden="true"></div>
+        </div>
+        <div class="auth-modal__actions">
+            <button type="button" class="auth-button auth-button--primary" data-action="forgot-send"
+                    th:text="#{forgot.email.submit}">Send code</button>
+        </div>
+    </div>
+</section>
+
+<!-- Forgot password step 2 -->
+<section class="auth-modal" data-modal="forgot-code" hidden aria-hidden="true">
+    <div class="auth-modal__dialog">
+        <button type="button" class="auth-modal__close" data-action="close-modal" aria-label="Close"></button>
+        <div class="auth-modal__body">
+            <h2 class="auth-modal__title" th:text="#{forgot.code.title}">Enter code</h2>
+            <p class="auth-modal__text"
+               data-forgot-code-description
+               th:text="#{forgot.code.subtitle}"
+               th:attr="data-template=#{forgot.code.subtitle}">Enter the 8-digit code we sent to your e-mail.</p>
+            <label class="auth-field auth-field--center">
+                <span class="auth-field__label sr-only" th:text="#{otp.modal.label}">Verification code</span>
+                <input class="auth-field__input auth-field__input--otp"
+                       type="text"
+                       inputmode="numeric"
+                       maxlength="8"
+                       data-forgot-code-input
+                       th:attr="placeholder=#{otp.modal.placeholder}">
+            </label>
+            <div class="auth-message" data-forgot-code-message hidden aria-hidden="true"></div>
+        </div>
+        <div class="auth-modal__actions">
+            <button type="button" class="auth-button auth-button--primary" data-action="forgot-verify"
+                    th:text="#{forgot.code.submit}">Verify code</button>
+            <button type="button" class="auth-button auth-button--secondary" data-action="forgot-resend"
+                    th:text="#{otp.modal.resend}">Send again</button>
+        </div>
+    </div>
+</section>
+
+<!-- Forgot password step 3 -->
+<section class="auth-modal" data-modal="forgot-reset" hidden aria-hidden="true">
+    <div class="auth-modal__dialog">
+        <button type="button" class="auth-modal__close" data-action="close-modal" aria-label="Close"></button>
+        <div class="auth-modal__body">
+            <h2 class="auth-modal__title" th:text="#{forgot.reset.title}">Create new password</h2>
+            <p class="auth-modal__text" th:text="#{forgot.reset.subtitle}">Choose a new password for your account.</p>
+            <label class="auth-field auth-field--center">
+                <span class="auth-field__label" th:text="#{forgot.reset.field.password}">New password</span>
+                <input class="auth-field__input" type="password" data-forgot-password-input autocomplete="new-password">
+            </label>
+            <label class="auth-field auth-field--center">
+                <span class="auth-field__label" th:text="#{forgot.reset.field.confirm}">Confirm password</span>
+                <input class="auth-field__input" type="password" data-forgot-confirm-input autocomplete="new-password">
+            </label>
+            <p class="auth-hint auth-hint--center" th:text="#{register.password.hint}">Use at least 8 characters with uppercase, lowercase, number and symbol.</p>
+            <div class="auth-message" data-forgot-reset-message hidden aria-hidden="true"></div>
+        </div>
+        <div class="auth-modal__actions">
+            <button type="button" class="auth-button auth-button--primary" data-action="forgot-complete"
+                    th:text="#{forgot.reset.submit}">Save password</button>
+        </div>
+    </div>
+</section>
+
+<!-- Forgot password success -->
+<section class="auth-modal" data-modal="forgot-success" hidden aria-hidden="true">
+    <div class="auth-modal__dialog">
+        <button type="button" class="auth-modal__close" data-action="close-modal" aria-label="Close"></button>
+        <div class="auth-modal__body auth-modal__body--center">
+            <div class="auth-modal__status auth-modal__status--success"></div>
+            <h2 class="auth-modal__title" th:text="#{forgot.success.title}">Password updated</h2>
+            <p class="auth-modal__text" th:text="#{forgot.success.subtitle}">You can now sign in with your new password.</p>
+        </div>
+        <div class="auth-modal__actions">
+            <button type="button" class="auth-button auth-button--primary" data-action="go-signin"
+                    th:text="#{forgot.success.button}">Sign in</button>
+        </div>
+    </div>
+</section>
+
+<!-- Modal data messages -->
+<div hidden
+     data-i18n-store
+     th:attr="data-otp-error=#{otp.modal.error},
+              data-otp-resend-success=#{otp.modal.resend.success},
+              data-otp-resend-wait=#{otp.modal.resend.wait},
+              data-forgot-email-error=#{forgot.email.error},
+              data-forgot-code-error=#{forgot.code.error},
+              data-forgot-password-error=#{forgot.reset.error},
+              data-forgot-password-mismatch=#{forgot.reset.mismatch},
+              data-forgot-password-weak=#{forgot.reset.weak},
+              data-generic-error=#{common.error.generic}">
+</div>
+
 <script src="/js/login.js" defer></script>
 </body>
 </html>
-
-
-
-
-
-
