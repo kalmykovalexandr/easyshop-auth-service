@@ -64,10 +64,12 @@ public class GlobalExceptionHandler {
             fieldErrors.put(field, errorCode);
         }
 
+        ErrorCode topLevelError = determineTopLevelError(fieldErrors);
+
         ErrorResponse response = ErrorResponse.builder()
-                .detail(ErrorCode.VALIDATION_ERROR.getMessage())
+                .detail(topLevelError.getMessage())
                 .errors(fieldErrors)
-                .errorCode(ErrorCode.VALIDATION_ERROR.name())
+                .errorCode(topLevelError.name())
                 .status(HttpStatus.BAD_REQUEST.name())
                 .statusCode(HttpStatus.BAD_REQUEST.value())
                 .path(request.getRequestURI())
@@ -103,6 +105,25 @@ public class GlobalExceptionHandler {
             };
             default -> ErrorCode.FIELD_INVALID.name();
         };
+    }
+
+    private ErrorCode determineTopLevelError(Map<String, String> fieldErrors) {
+        if (fieldErrors.containsValue(ErrorCode.EMAIL_INVALID.name())) {
+            return ErrorCode.EMAIL_INVALID;
+        }
+        if (fieldErrors.containsValue(ErrorCode.EMAIL_REQUIRED.name())) {
+            return ErrorCode.EMAIL_REQUIRED;
+        }
+        if (fieldErrors.containsValue(ErrorCode.PASSWORD_WEAK.name())) {
+            return ErrorCode.PASSWORD_WEAK;
+        }
+        if (fieldErrors.containsValue(ErrorCode.PASSWORD_REQUIRED.name())) {
+            return ErrorCode.PASSWORD_REQUIRED;
+        }
+        if (fieldErrors.containsValue(ErrorCode.PASSWORDS_DO_NOT_MATCH.name())) {
+            return ErrorCode.PASSWORDS_DO_NOT_MATCH;
+        }
+        return ErrorCode.VALIDATION_ERROR;
     }
 
     /**

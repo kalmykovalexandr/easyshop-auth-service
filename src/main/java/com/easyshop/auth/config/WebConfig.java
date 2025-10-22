@@ -36,7 +36,7 @@ public class WebConfig implements WebMvcConfigurer {
         resolver.setCookieName("easyshop-lang");
         resolver.setCookiePath("/");
         resolver.setCookieMaxAge((int) Duration.ofDays(365).getSeconds());
-        resolver.setDefaultLocale(Locale.forLanguageTag("ru"));
+        resolver.setDefaultLocale(Locale.ENGLISH);
         return resolver;
     }
 

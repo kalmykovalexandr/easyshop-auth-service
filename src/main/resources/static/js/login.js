@@ -20,6 +20,7 @@
   const messages = i18nStore ? { ...i18nStore.dataset } : {}
 
   const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/
+  const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
   const otpModal = document.querySelector('[data-modal="otp"]')
   const otpInput = otpModal?.querySelector('[data-otp-input]')
@@ -62,6 +63,10 @@
 
   function isPasswordStrong(value) {
     return PASSWORD_REGEX.test(value || '')
+  }
+
+  function isEmailValid(value) {
+    return EMAIL_REGEX.test(value || '')
   }
 
   function openModal(modal) {
@@ -273,6 +278,11 @@
         emailInput?.focus()
         return
       }
+      if (!isEmailValid(email)) {
+        showMessage(registerError, registerForm.dataset.errorEmail || getMessage('register.errors.email', 'Enter a valid e-mail.'))
+        emailInput?.focus()
+        return
+      }
 
       if (!password) {
         showMessage(registerError, registerForm.dataset.errorPassword || 'Enter a password.')
@@ -317,6 +327,28 @@
           if (otpModalOpened) {
             closeModal(otpModal)
             registerEmail = ''
+          }
+          const errors = payload?.errors || {}
+          const errorCode = payload?.errorCode
+          if (errors.email === 'EMAIL_INVALID' || errors.email === 'EMAIL_REQUIRED' || errorCode === 'EMAIL_INVALID' || errorCode === 'EMAIL_REQUIRED') {
+            showMessage(registerError, registerForm.dataset.errorEmail || getMessage('register.errors.email', 'Enter a valid e-mail.'))
+            emailInput?.focus()
+            return
+          }
+          if (errors.password === 'PASSWORD_WEAK' || errors.password === 'PASSWORD_REQUIRED') {
+            showMessage(registerError, registerForm.dataset.errorPassword || getMessage('register.errors.password', 'Password does not meet requirements.'))
+            passwordInput?.focus()
+            return
+          }
+          if (errors.confirmPassword === 'PASSWORDS_DO_NOT_MATCH') {
+            showMessage(registerError, registerForm.dataset.errorMismatch || getMessage('register.errors.mismatch', 'Passwords do not match.'))
+            confirmInput?.focus()
+            return
+          }
+          if (errors.confirmPassword === 'PASSWORD_WEAK' || errors.confirmPassword === 'PASSWORD_REQUIRED') {
+            showMessage(registerError, registerForm.dataset.errorPassword || getMessage('register.errors.password', 'Password does not meet requirements.'))
+            confirmInput?.focus()
+            return
           }
           const message = (payload && payload.detail) || registerForm.dataset.errorGeneric || getMessage('genericError', 'Could not create the account.')
           showMessage(registerError, message)
@@ -419,6 +451,10 @@
         showMessage(forgotEmailMessage, getMessage('forgotEmailError', 'Enter a valid e-mail.'))
         return
       }
+      if (!isEmailValid(email)) {
+        showMessage(forgotEmailMessage, getMessage('forgotEmailError', 'Enter a valid e-mail.'))
+        return
+      }
       forgotEmailInput && (forgotEmailInput.value = email)
 
       let codeModalOpened = false
@@ -454,6 +490,15 @@
             return
           }
           const message = (payload && payload.detail) || getMessage('genericError', 'Could not send the code.')
+          const emailErrorCode = payload?.errors?.email || payload?.errorCode
+          if (emailErrorCode === 'EMAIL_INVALID' || emailErrorCode === 'EMAIL_REQUIRED') {
+            showMessage(forgotEmailMessage, getMessage('forgotEmailError', 'Enter a valid e-mail.'))
+            return
+          }
+          if (message && message.toLowerCase().includes('invalid request content')) {
+            showMessage(forgotEmailMessage, getMessage('forgotEmailError', 'Enter a valid e-mail.'))
+            return
+          }
           showMessage(forgotEmailMessage, message)
           return
         }
@@ -501,6 +546,12 @@
           body: JSON.stringify({ email: forgotEmail, code, activateUser: false })
         })
         if (!response.ok) {
+          const errors = payload?.errors || {}
+          const codeError = errors.code || payload?.errorCode
+          if (codeError === 'VERIFICATION_CODE_INVALID' || codeError === 'VERIFICATION_CODE_EXPIRED') {
+            showMessage(forgotCodeMessage, getMessage('forgotCodeError', 'Verification failed.'))
+            return
+          }
           const message = (payload && payload.detail) || getMessage('forgotCodeError', 'Verification failed.')
           showMessage(forgotCodeMessage, message)
           return
@@ -583,6 +634,16 @@
           body: JSON.stringify({ email: forgotEmail, password, confirmPassword: confirm, resetToken })
         })
         if (!response.ok) {
+          const errors = payload?.errors || {}
+          const errorCode = payload?.errorCode
+          if (errors.password === 'PASSWORD_WEAK' || errors.password === 'PASSWORD_REQUIRED' || errors.confirmPassword === 'PASSWORD_WEAK' || errors.confirmPassword === 'PASSWORD_REQUIRED' || errorCode === 'PASSWORD_WEAK' || errorCode === 'PASSWORD_REQUIRED') {
+            showMessage(forgotResetMessage, getMessage('forgotPasswordWeak', 'Password does not meet requirements.'))
+            return
+          }
+          if (errors.confirmPassword === 'PASSWORDS_DO_NOT_MATCH' || errorCode === 'PASSWORDS_DO_NOT_MATCH') {
+            showMessage(forgotResetMessage, getMessage('forgotPasswordMismatch', 'Passwords do not match.'))
+            return
+          }
           const message = (payload && payload.detail) || getMessage('genericError', 'Could not reset password.')
           showMessage(forgotResetMessage, message)
           return
