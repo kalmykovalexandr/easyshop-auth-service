@@ -304,7 +304,7 @@
 
       let otpModalOpened = false
       if (otpModal) {
-        registerEmail = email
+        registerEmail = (email || '')
         if (otpDescription) {
           const template = otpDescription.dataset.template || otpDescription.textContent || ''
           otpDescription.textContent = format(template, registerEmail)
@@ -356,7 +356,7 @@
         }
 
         if (!otpModalOpened && otpModal) {
-          registerEmail = email
+          registerEmail = (email || '')
           if (otpDescription) {
             const template = otpDescription.dataset.template || otpDescription.textContent || ''
             otpDescription.textContent = format(template, registerEmail)
@@ -385,7 +385,12 @@
         return
       }
 
-      if (!registerEmail) {
+      // Disabled-login flow: always use email from sign-in field; otherwise use register email
+      const params = new URLSearchParams(window.location.search || '')
+      const isDisabled = params.get('error') === 'disabled'
+      const emailFromInput = signinForm?.querySelector('input[name="username"]')?.value || ''
+      const emailToUse = isDisabled ? (emailFromInput || '') : (registerEmail || '')
+      if (!emailToUse) {
         showMessage(otpMessage, getMessage('otpError', 'Registration session expired.'))
         return
       }
@@ -395,7 +400,7 @@
       try {
         const { response, payload } = await fetchJson('/api/auth/verify-code', {
           method: 'POST',
-          body: JSON.stringify({ email: registerEmail, code, activateUser: true })
+          body: JSON.stringify({ email: emailToUse, code, activateUser: true })
         })
 
         if (!response.ok) {
@@ -414,7 +419,11 @@
 
     otpModal.querySelector('[data-action="otp-resend"]')?.addEventListener('click', async (event) => {
       const button = event.currentTarget
-      if (!registerEmail) {
+      const params = new URLSearchParams(window.location.search || '')
+      const isDisabled = params.get('error') === 'disabled'
+      const emailFromInput = signinForm?.querySelector('input[name="username"]')?.value || ''
+      const emailToUse = isDisabled ? (emailFromInput || '') : (registerEmail || '')
+      if (!emailToUse) {
         showMessage(otpMessage, getMessage('otpError', 'Registration session expired.'))
         return
       }
@@ -422,7 +431,7 @@
       try {
         const { response, payload } = await fetchJson('/api/auth/send-verification-code', {
           method: 'POST',
-          body: JSON.stringify({ email: registerEmail })
+          body: JSON.stringify({ email: emailToUse })
         })
         if (!response.ok) {
           const retryAfter = response.headers.get('Retry-After')
@@ -670,5 +679,43 @@
   })
 
   setMode('signin')
+
+  // Open OTP modal automatically after disabled sign-in
+  try {
+    const params = new URLSearchParams(window.location.search || '')
+    const loginError = params.get('error')
+    if (loginError === 'disabled' && otpModal) {
+      // Try to prefill e-mail from last attempted username rendered by server
+      const lastUsernameInput = signinForm?.querySelector('input[name="username"]')
+      registerEmail = (lastUsernameInput?.value || '')
+
+      if (otpDescription) {
+        const disabledText = getMessage('otpDisabled', 'Account not verified. We sent a new code to your email.')
+        const fallbackEmail = signinForm?.querySelector('input[name="username"]')?.value || ''
+        const displayEmail = (fallbackEmail || registerEmail || 'your e-mail')
+        otpDescription.textContent = format(disabledText, displayEmail)
+      }
+      if (otpInput) {
+        otpInput.value = ''
+      }
+      clearMessage(otpMessage)
+      openModal(otpModal)
+
+      // Ensure there is a valid code: send new only if absent/expired
+      const emailToUse = signinForm?.querySelector('input[name="username"]')?.value || ''
+      if (emailToUse) {
+        try {
+          await fetchJson('/api/auth/ensure-verification-code', {
+            method: 'POST',
+            body: JSON.stringify({ email: emailToUse })
+          })
+        } catch (e) {
+          // no-op: user can press "Send again"
+        }
+      }
+    }
+  } catch (e) {
+    // no-op
+  }
 })()
 

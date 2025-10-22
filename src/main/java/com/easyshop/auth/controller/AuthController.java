@@ -42,6 +42,12 @@ public class AuthController {
         return ResponseEntity.accepted().build();
     }
 
+    @PostMapping(value = "/ensure-verification-code", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<Void> ensureVerificationCode(@Valid @RequestBody OtpSendDto dto) {
+        otpService.ensureActiveOtp(dto.getEmail());
+        return ResponseEntity.accepted().build();
+    }
+
     @PostMapping(value = "/verify-code", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<VerifyCodeResponseDto> verifyCode(@Valid @RequestBody VerifyCodeDto dto) {
         VerifyCodeResponseDto response = otpService.verifyOtp(dto);

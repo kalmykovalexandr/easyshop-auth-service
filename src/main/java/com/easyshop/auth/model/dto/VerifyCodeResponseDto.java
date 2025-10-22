@@ -6,5 +6,5 @@ import lombok.Getter;
 @Getter
 @AllArgsConstructor
 public class VerifyCodeResponseDto {
-    private final String resetToken;
+    private String resetToken;
 }

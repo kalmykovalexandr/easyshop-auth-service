@@ -32,14 +32,31 @@ public class AuthService implements AuthServiceInt {
     @Override
     @Transactional
     public void register(AuthDto dto) {
-        if (userRepository.existsByEmail(dto.getEmail())) {
-            throw new BusinessException(ErrorCode.EMAIL_ALREADY_USED);
+        String email = dto.getEmail();
+
+        // Check existing user by email
+        User existing = userRepository.findByEmail(email).orElse(null);
+        String encodedPwd = passwordEncoder.encode(dto.getPassword());
+
+        if (existing != null) {
+            // If already verified, keep previous behavior (conflict)
+            if (Boolean.TRUE.equals(existing.getEnabled())) {
+                throw new BusinessException(ErrorCode.EMAIL_ALREADY_USED);
+            }
+
+            // Continue registration for not yet verified user:
+            // - update password to the latest provided
+            // - resend OTP (previous code becomes obsolete)
+            existing.setPassword(encodedPwd);
+            userRepository.save(existing);
+            otpService.generateOtp(email);
+            log.info("Registration resumed for {}. OTP re-sent.", email);
+            return;
         }
 
-        String encodedPwd = passwordEncoder.encode(dto.getPassword());
+        // First-time registration path
         User user = userRepository.save(User.from(dto, encodedPwd, false));
-
-        otpService.generateOtp(dto.getEmail());
+        otpService.generateOtp(email);
         log.info("Registration started for {}. Awaiting email verification.", user.getEmail());
     }
 

@@ -73,6 +73,27 @@ public class OtpService implements OtpServiceInt {
     }
 
     @Override
+    public void ensureActiveOtp(String email) {
+        Instant now = Instant.now();
+        OtpState current = otpStateRepository.load(email).orElseGet(OtpState::empty);
+        if (current.hasOtp() && !current.isOtpExpired(now)) {
+            // Active code exists — do nothing
+            return;
+        }
+        String code = generateCode();
+        OtpState updated = current.startOtp(code, now, otpTtl, resendCooldown);
+        otpStateRepository.save(email, updated, now);
+        try {
+            emailService.sendVerificationEmail(email, code);
+            log.info("OTP ensured (new issued) for {}", email);
+        } catch (RuntimeException ex) {
+            otpStateRepository.delete(email);
+            log.warn("Failed to send OTP email during ensure. Cleaned up Redis entry for {}", email, ex);
+            throw ex;
+        }
+    }
+
+    @Override
     public VerifyCodeResponseDto verifyOtp(VerifyCodeDto dto) {
         Instant now = Instant.now();
         String email = dto.getEmail();
