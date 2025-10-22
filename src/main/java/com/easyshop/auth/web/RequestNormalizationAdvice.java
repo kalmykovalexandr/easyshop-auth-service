@@ -28,7 +28,8 @@ public class RequestNormalizationAdvice extends RequestBodyAdviceAdapter {
                                 Type targetType, Class<? extends HttpMessageConverter<?>> converterType) {
         // TODO check performance for this block
         if (body instanceof AuthDto dto) {
-            return new AuthDto(normalize(dto.getEmail()), dto.getPassword());
+            // TODO check that both passwords are equals
+            return new AuthDto(normalize(dto.getEmail()), dto.getPassword(), dto.getConfirmPassword());
         }
         if (body instanceof OtpSendDto dto) {
             return new OtpSendDto(normalize(dto.getEmail()));

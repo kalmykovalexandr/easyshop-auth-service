@@ -701,17 +701,13 @@
       clearMessage(otpMessage)
       openModal(otpModal)
 
-      // Ensure there is a valid code: send new only if absent/expired
+      // Ensure there is a valid code: send new only if absent/expired (fire-and-forget)
       const emailToUse = signinForm?.querySelector('input[name="username"]')?.value || ''
       if (emailToUse) {
-        try {
-          await fetchJson('/api/auth/ensure-verification-code', {
-            method: 'POST',
-            body: JSON.stringify({ email: emailToUse })
-          })
-        } catch (e) {
-          // no-op: user can press "Send again"
-        }
+        fetchJson('/api/auth/ensure-verification-code', {
+          method: 'POST',
+          body: JSON.stringify({ email: emailToUse })
+        }).catch(() => {})
       }
     }
   } catch (e) {
