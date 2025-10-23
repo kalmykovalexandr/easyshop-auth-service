@@ -46,6 +46,7 @@
 
   let activeModal = null
   let registerEmail = ''
+  let otpEmail = ''
   let forgotEmail = ''
   let resetToken = ''
   let resendTimer = null
@@ -67,6 +68,20 @@
 
   function isEmailValid(value) {
     return EMAIL_REGEX.test(value || '')
+  }
+
+  // Remove error query param from URL and hide server-rendered error message
+  function removeErrorParam() {
+    try {
+      const url = new URL(window.location.href)
+      if (url.searchParams.has('error')) {
+        url.searchParams.delete('error')
+        const search = url.searchParams.toString()
+        const newUrl = url.pathname + (search ? `?${search}` : '') + url.hash
+        window.history.replaceState({}, document.title, newUrl)
+      }
+      clearMessage(signinError)
+    } catch (_) {}
   }
 
   function openModal(modal) {
@@ -105,6 +120,7 @@
   })
 
   registerSuccessModal?.querySelector('[data-action="close-modal"]')?.addEventListener('click', () => {
+    removeErrorParam()
     setMode('signin')
   })
 
@@ -115,6 +131,7 @@
   document.querySelectorAll('[data-action="go-signin"]').forEach((button) => {
     button.addEventListener('click', () => {
       closeAllModals()
+      removeErrorParam()
       setMode('signin')
       signinForm?.querySelector('input[name="username"]')?.focus()
     })
@@ -388,8 +405,7 @@
       // Disabled-login flow: always use email from sign-in field; otherwise use register email
       const params = new URLSearchParams(window.location.search || '')
       const isDisabled = params.get('error') === 'disabled'
-      const emailFromInput = signinForm?.querySelector('input[name="username"]')?.value || ''
-      const emailToUse = isDisabled ? (emailFromInput || '') : (registerEmail || '')
+      const emailToUse = isDisabled ? (otpEmail || '') : (registerEmail || '')
       if (!emailToUse) {
         showMessage(otpMessage, getMessage('otpError', 'Registration session expired.'))
         return
@@ -421,8 +437,7 @@
       const button = event.currentTarget
       const params = new URLSearchParams(window.location.search || '')
       const isDisabled = params.get('error') === 'disabled'
-      const emailFromInput = signinForm?.querySelector('input[name="username"]')?.value || ''
-      const emailToUse = isDisabled ? (emailFromInput || '') : (registerEmail || '')
+      const emailToUse = isDisabled ? (otpEmail || '') : (registerEmail || '')
       if (!emailToUse) {
         showMessage(otpMessage, getMessage('otpError', 'Registration session expired.'))
         return
@@ -687,12 +702,13 @@
     if (loginError === 'disabled' && otpModal) {
       // Try to prefill e-mail from last attempted username rendered by server
       const lastUsernameInput = signinForm?.querySelector('input[name="username"]')
-      registerEmail = (lastUsernameInput?.value || '')
+      const usernameVal = (lastUsernameInput?.value || '')
+      // For disabled flow prefer email captured from registration if present, otherwise username
+      otpEmail = registerEmail || usernameVal
 
       if (otpDescription) {
         const disabledText = getMessage('otpDisabled', 'Account not verified. We sent a new code to your email.')
-        const fallbackEmail = signinForm?.querySelector('input[name="username"]')?.value || ''
-        const displayEmail = (fallbackEmail || registerEmail || 'your e-mail')
+        const displayEmail = (otpEmail || registerEmail || signinForm?.querySelector('input[name="username"]')?.value || 'your e-mail')
         otpDescription.textContent = format(disabledText, displayEmail)
       }
       if (otpInput) {
@@ -702,7 +718,7 @@
       openModal(otpModal)
 
       // Ensure there is a valid code: send new only if absent/expired (fire-and-forget)
-      const emailToUse = signinForm?.querySelector('input[name="username"]')?.value || ''
+      const emailToUse = otpEmail || signinForm?.querySelector('input[name="username"]')?.value || ''
       if (emailToUse) {
         fetchJson('/api/auth/ensure-verification-code', {
           method: 'POST',

@@ -22,6 +22,15 @@ public class AccountStatusAuthenticationFailureHandler extends SimpleUrlAuthenti
                                         HttpServletResponse response,
                                         AuthenticationException exception)
             throws IOException, ServletException {
+        // Persist last attempted username so the login page can preload it
+        try {
+            String username = request.getParameter("username");
+            if (username != null && !username.isBlank()) {
+                request.getSession(true).setAttribute("SPRING_SECURITY_LAST_USERNAME", username);
+            }
+        } catch (Exception ignored) {
+        }
+
         if (exception instanceof DisabledException) {
             super.setDefaultFailureUrl(DISABLED_URL);
         } else {

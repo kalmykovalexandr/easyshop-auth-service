@@ -29,16 +29,21 @@ public class RequestNormalizationAdvice extends RequestBodyAdviceAdapter {
         // TODO check performance for this block
         if (body instanceof AuthDto dto) {
             // TODO check that both passwords are equals
-            return new AuthDto(normalize(dto.getEmail()), dto.getPassword(), dto.getConfirmPassword());
+            dto.setEmail(normalize(dto.getEmail()));
+            return dto;
         }
         if (body instanceof OtpSendDto dto) {
-            return new OtpSendDto(normalize(dto.getEmail()));
+            dto.setEmail(normalize(dto.getEmail()));
+            return dto;
         }
         if (body instanceof VerifyCodeDto dto) {
-            return new VerifyCodeDto(normalize(dto.getEmail()), dto.getCode(), dto.getActivateUser());
+            dto.setEmail(normalize(dto.getEmail()));
+            return dto;
         }
         if (body instanceof PasswordResetDto dto) {
-            return new PasswordResetDto(normalize(dto.getEmail()), dto.getPassword(), dto.getConfirmPassword(), dto.getResetToken());
+            // TODO check that both passwords are equals
+            dto.setEmail(normalize(dto.getEmail()));
+            return dto;
         }
         return body;
     }
