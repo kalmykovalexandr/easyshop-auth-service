@@ -28,7 +28,8 @@
                   data-signin-form
                   novalidate
                   th:attr="data-error-email=#{login.errors.emailRequired},
-                           data-error-password=#{login.errors.passwordRequired}">
+                           data-error-password=#{login.errors.passwordRequired},
+                           data-error-fill=#{login.errors.fillAll}">
                 <label class="auth-field">
                     <span class="auth-field__label" th:text="#{login.field.email}">E-mail</span>
                     <input class="auth-field__input" type="email" name="username" autocomplete="username" required th:value="${lastUsername}">
@@ -243,13 +244,35 @@
         <div class="auth-modal__body">
             <h2 class="auth-modal__title" th:text="#{forgot.reset.title}">Create new password</h2>
             <p class="auth-modal__text" th:text="#{forgot.reset.subtitle}">Choose a new password for your account.</p>
-            <label class="auth-field auth-field--center">
+            <label class="auth-field auth-field--center auth-field--with-toggle">
                 <span class="auth-field__label" th:text="#{forgot.reset.field.password}">New password</span>
-                <input class="auth-field__input" type="password" data-forgot-password-input autocomplete="new-password">
+                <div class="auth-field__control">
+                    <input class="auth-field__input" type="password" data-forgot-password-input autocomplete="new-password">
+                    <button type="button"
+                            class="auth-field__toggle auth-field__toggle--hidden"
+                            data-toggle-password
+                            th:attr="data-label-show=#{login.password.toggle.show},
+                                     data-label-hide=#{login.password.toggle.hide},
+                                     aria-label=#{login.password.toggle.show}">
+                        <span class="auth-field__toggle-icon" aria-hidden="true"></span>
+                        <span class="sr-only" th:text="#{login.password.toggle.show}">Show password</span>
+                    </button>
+                </div>
             </label>
-            <label class="auth-field auth-field--center">
+            <label class="auth-field auth-field--center auth-field--with-toggle">
                 <span class="auth-field__label" th:text="#{forgot.reset.field.confirm}">Confirm password</span>
-                <input class="auth-field__input" type="password" data-forgot-confirm-input autocomplete="new-password">
+                <div class="auth-field__control">
+                    <input class="auth-field__input" type="password" data-forgot-confirm-input autocomplete="new-password">
+                    <button type="button"
+                            class="auth-field__toggle auth-field__toggle--hidden"
+                            data-toggle-password
+                            th:attr="data-label-show=#{login.password.toggle.show},
+                                     data-label-hide=#{login.password.toggle.hide},
+                                     aria-label=#{login.password.toggle.show}">
+                        <span class="auth-field__toggle-icon" aria-hidden="true"></span>
+                        <span class="sr-only" th:text="#{login.password.toggle.show}">Show password</span>
+                    </button>
+                </div>
             </label>
             <p class="auth-hint auth-hint--center" th:text="#{register.password.hint}">Use at least 8 characters with uppercase, lowercase, number and symbol.</p>
             <div class="auth-message" data-forgot-reset-message hidden aria-hidden="true"></div>

@@ -199,6 +199,37 @@
     }
   }
 
+  // Sign-in client-side validation
+  if (signinForm) {
+    signinForm.addEventListener('submit', (event) => {
+      const emailInput = signinForm.querySelector('input[name="username"]')
+      const passwordInput = signinForm.querySelector('input[name="password"]')
+      const email = emailInput?.value?.trim() || ''
+      const password = passwordInput?.value || ''
+
+      // All fields empty or one empty → single fill-all message
+      if (!email || !password) {
+        const fillMsg = signinForm.dataset.errorFill || signinForm.dataset.errorEmail || 'Fill all fields.'
+        showMessage(signinError, fillMsg)
+        if (!email) {
+          emailInput?.focus()
+        } else {
+          passwordInput?.focus()
+        }
+        event.preventDefault()
+        return
+      }
+
+      // Invalid email format
+      if (!isEmailValid(email)) {
+        const msg = signinForm.dataset.errorEmail || 'Enter a valid e-mail address.'
+        showMessage(signinError, msg)
+        emailInput?.focus()
+        event.preventDefault()
+      }
+    })
+  }
+
   const passwordToggles = Array.from(root.querySelectorAll('[data-toggle-password]'))
 
   passwordToggles.forEach((button) => {
@@ -210,17 +241,23 @@
 
     const updateToggleVisibility = () => {
       const hasValue = Boolean(input.value && input.value.length > 0)
-      button.classList.toggle('auth-field__toggle--hidden', !hasValue)
+      const focused = document.activeElement === input
+      // Показать «глаз» только когда поле в фокусе и есть значение
+      button.classList.toggle('auth-field__toggle--hidden', !(focused && hasValue))
     }
 
     input.addEventListener('input', updateToggleVisibility)
     input.addEventListener('change', updateToggleVisibility)
+    input.addEventListener('focus', updateToggleVisibility)
+    input.addEventListener('blur', updateToggleVisibility)
+    // Изначально скрыть
     updateToggleVisibility()
 
     button.addEventListener('click', (event) => {
       event.preventDefault()
       togglePasswordVisibility(button)
       input.focus()
+      updateToggleVisibility()
     })
   })
 
@@ -688,10 +725,11 @@
     }
   })
 
-  // Helper to clear signin client errors on input
-  signinForm?.addEventListener('input', () => {
-    clearMessage(signinError)
-  })
+  // Clear signin error only when user edits email or password
+  const usernameInput = signinForm?.querySelector('input[name="username"]')
+  const passwordInput = signinForm?.querySelector('input[name="password"]')
+  usernameInput?.addEventListener('input', () => clearMessage(signinError))
+  passwordInput?.addEventListener('input', () => clearMessage(signinError))
 
   setMode('signin')
 
