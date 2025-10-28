@@ -5,6 +5,7 @@ import com.easyshop.auth.model.dto.OtpSendDto;
 import com.easyshop.auth.model.dto.PasswordResetDto;
 import com.easyshop.auth.model.dto.VerifyCodeDto;
 import com.easyshop.auth.model.dto.VerifyCodeResponseDto;
+import com.easyshop.auth.model.dto.error.ErrorResponse;
 import com.easyshop.auth.service.AuthServiceInt;
 import com.easyshop.auth.service.OtpServiceInt;
 import jakarta.validation.Valid;
@@ -37,15 +38,15 @@ public class AuthController {
     }
 
     @PostMapping(value = "/send-verification-code", consumes = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<Void> sendVerificationCode(@Valid @RequestBody OtpSendDto dto) {
-        otpService.generateOtp(dto.getEmail());
-        return ResponseEntity.accepted().build();
-    }
-
-    @PostMapping(value = "/ensure-verification-code", consumes = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<Void> ensureVerificationCode(@Valid @RequestBody OtpSendDto dto) {
-        otpService.ensureActiveOtp(dto.getEmail());
-        return ResponseEntity.accepted().build();
+    public ResponseEntity<com.easyshop.auth.model.dto.error.ErrorResponse> sendVerificationCode(@Valid @RequestBody OtpSendDto dto) {
+        String detail = otpService.generateOtp(dto.getEmail());
+        var body = ErrorResponse.builder()
+                .detail(detail)
+                .status("ACCEPTED")
+                .statusCode(202)
+                .path("/api/auth/send-verification-code")
+                .build();
+        return ResponseEntity.accepted().body(body);
     }
 
     @PostMapping(value = "/verify-code", consumes = MediaType.APPLICATION_JSON_VALUE)

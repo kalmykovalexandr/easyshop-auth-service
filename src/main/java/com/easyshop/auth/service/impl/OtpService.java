@@ -53,42 +53,32 @@ public class OtpService implements OtpServiceInt {
     }
 
     @Override
-    public void generateOtp(String email) {
+    public String generateOtp(String email) {
+        // If user does not exist, do not send anything (avoid enumeration/spam)
+        if (userRepository.findByEmail(email).isEmpty()) {
+            return "If this e-mail is registered, we sent a code.";
+        }
+
         Instant now = Instant.now();
-        OtpState current = otpStateRepository.load(email).orElseGet(OtpState::empty);
-        enforceCooldown(current, now);
+        OtpState otp = otpStateRepository.load(email).orElseGet(OtpState::empty);
+
+        if (otp.hasOtp() && !otp.isOtpExpired(now)) {
+            // Active code present: idempotent no-op
+            log.info("OTP already active for {} — no-op", email);
+            return "Code already sent. Check your e-mail.";
+        }
 
         String code = generateCode();
-        OtpState updated = current.startOtp(code, now, otpTtl, resendCooldown);
+        OtpState updated = otp.startOtp(code, now, otpTtl, resendCooldown);
         otpStateRepository.save(email, updated, now);
 
         try {
             emailService.sendVerificationEmail(email, code);
             log.info("OTP generated for {}", email);
+            return "Verification code sent. Check your e-mail.";
         } catch (RuntimeException ex) {
             otpStateRepository.delete(email);
             log.warn("Failed to send OTP email. Cleaned up Redis entry for {}", email, ex);
-            throw ex;
-        }
-    }
-
-    @Override
-    public void ensureActiveOtp(String email) {
-        Instant now = Instant.now();
-        OtpState current = otpStateRepository.load(email).orElseGet(OtpState::empty);
-        if (current.hasOtp() && !current.isOtpExpired(now)) {
-            // Active code exists — do nothing
-            return;
-        }
-        String code = generateCode();
-        OtpState updated = current.startOtp(code, now, otpTtl, resendCooldown);
-        otpStateRepository.save(email, updated, now);
-        try {
-            emailService.sendVerificationEmail(email, code);
-            log.info("OTP ensured (new issued) for {}", email);
-        } catch (RuntimeException ex) {
-            otpStateRepository.delete(email);
-            log.warn("Failed to send OTP email during ensure. Cleaned up Redis entry for {}", email, ex);
             throw ex;
         }
     }

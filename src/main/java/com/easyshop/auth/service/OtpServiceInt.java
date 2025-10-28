@@ -4,8 +4,7 @@ import com.easyshop.auth.model.dto.VerifyCodeDto;
 import com.easyshop.auth.model.dto.VerifyCodeResponseDto;
 
 public interface OtpServiceInt {
-    void generateOtp(String email);
-    void ensureActiveOtp(String email);
+    String generateOtp(String email);
     VerifyCodeResponseDto verifyOtp(VerifyCodeDto dto);
     void validateResetToken(String email, String resetToken);
 }
