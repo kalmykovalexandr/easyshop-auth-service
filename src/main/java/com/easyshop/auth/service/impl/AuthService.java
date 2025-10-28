@@ -63,6 +63,7 @@ public class AuthService implements AuthServiceInt {
     @Override
     @Transactional
     public void resetPassword(PasswordResetDto request) {
+        // TODO move this check into advice layer
         if (!request.getPassword().equals(request.getConfirmPassword())) {
             throw new BusinessException(ErrorCode.PASSWORDS_DO_NOT_MATCH);
         }

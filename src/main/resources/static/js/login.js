@@ -250,9 +250,9 @@
     input.addEventListener('change', updateToggleVisibility)
     input.addEventListener('focus', updateToggleVisibility)
     input.addEventListener('blur', updateToggleVisibility)
-    // Изначально скрыть
     updateToggleVisibility()
 
+    button.addEventListener('mousedown', (e) => e.preventDefault())
     button.addEventListener('click', (event) => {
       event.preventDefault()
       togglePasswordVisibility(button)
@@ -420,6 +420,11 @@
           }
           clearMessage(otpMessage)
           openModal(otpModal)
+          // ensure при открытии модалки после успешной регистрации
+          fetchJson('/api/auth/ensure-verification-code', {
+            method: 'POST',
+            body: JSON.stringify({ email: registerEmail })
+          }).catch(() => {})
         }
       } catch (error) {
         if (otpModalOpened) {
@@ -534,7 +539,7 @@
       }
 
       try {
-        const { response, payload } = await fetchJson('/api/auth/send-verification-code', {
+        const { response, payload } = await fetchJson('/api/auth/ensure-verification-code', {
           method: 'POST',
           body: JSON.stringify({ email })
         })
@@ -543,13 +548,8 @@
             closeModal(forgotCodeModal)
           }
           forgotEmail = ''
-          const retryAfter = response.headers.get('Retry-After')
           openModal(forgotEmailModal)
           forgotEmailInput && (forgotEmailInput.value = email)
-          if (response.status === 429 && retryAfter) {
-            showMessage(forgotEmailMessage, getMessage('otpResendWait', 'Please wait {0} seconds before requesting again.').replace('{0}', retryAfter))
-            return
-          }
           const message = (payload && payload.detail) || getMessage('genericError', 'Could not send the code.')
           const emailErrorCode = payload?.errors?.email || payload?.errorCode
           if (emailErrorCode === 'EMAIL_INVALID' || emailErrorCode === 'EMAIL_REQUIRED') {
@@ -768,4 +768,3 @@
     // no-op
   }
 })()
-
