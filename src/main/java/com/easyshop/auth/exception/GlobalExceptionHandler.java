@@ -103,6 +103,7 @@ public class GlobalExceptionHandler {
                 case "Pattern" -> ErrorCode.PASSWORD_INVALID.name();
                 default -> ErrorCode.PASSWORDS_DO_NOT_MATCH.name();
             };
+            case "passwordsMatch" -> ErrorCode.PASSWORDS_DO_NOT_MATCH.name();
             default -> ErrorCode.FIELD_INVALID.name();
         };
     }

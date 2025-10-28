@@ -421,7 +421,7 @@
           clearMessage(otpMessage)
           openModal(otpModal)
           // ensure при открытии модалки после успешной регистрации
-          fetchJson('/api/auth/send-verification-code', {
+          fetchJson('/api/auth/send-code', {
             method: 'POST',
             body: JSON.stringify({ email: registerEmail })
           }).catch(() => {})
@@ -486,7 +486,7 @@
       }
       clearMessage(otpMessage)
       try {
-        const { response, payload } = await fetchJson('/api/auth/send-verification-code', {
+        const { response, payload } = await fetchJson('/api/auth/send-code', {
           method: 'POST',
           body: JSON.stringify({ email: emailToUse })
         })
@@ -539,7 +539,7 @@
       }
 
       try {
-        const { response, payload } = await fetchJson('/api/auth/send-verification-code', {
+        const { response, payload } = await fetchJson('/api/auth/send-code', {
           method: 'POST',
           body: JSON.stringify({ email })
         })
@@ -640,7 +640,7 @@
       }
       clearMessage(forgotCodeMessage)
       try {
-        const { response, payload } = await fetchJson('/api/auth/send-verification-code', {
+        const { response, payload } = await fetchJson('/api/auth/send-code', {
           method: 'POST',
           body: JSON.stringify({ email: forgotEmail })
         })
@@ -758,7 +758,7 @@
       // Ensure there is a valid code: send new only if absent/expired (fire-and-forget)
       const emailToUse = otpEmail || signinForm?.querySelector('input[name="username"]')?.value || ''
       if (emailToUse) {
-        fetchJson('/api/auth/send-verification-code', {
+        fetchJson('/api/auth/send-code', {
           method: 'POST',
           body: JSON.stringify({ email: emailToUse })
         }).catch(() => {})

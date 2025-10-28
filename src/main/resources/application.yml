@@ -57,4 +57,4 @@ easyshop:
     rate-limit:
       window-seconds: ${AUTH_RATE_LIMIT_WINDOW_SECONDS:600}
       max-requests: ${AUTH_RATE_LIMIT_MAX_REQUESTS:10}
-      paths: ${AUTH_RATE_LIMIT_PATHS:/api/auth/send-verification-code,/api/auth/verify-code,/api/auth/reset-password,/api/auth/register}
+      paths: ${AUTH_RATE_LIMIT_PATHS:/api/auth/send-code,/api/auth/verify-code,/api/auth/reset-password,/api/auth/register}
