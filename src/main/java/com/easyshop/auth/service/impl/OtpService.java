@@ -53,19 +53,18 @@ public class OtpService implements OtpServiceInt {
     }
 
     @Override
-    public String generateOtp(String email) {
+    public void generateOtp(String email) {
         // If user does not exist, do not send anything (avoid enumeration/spam)
         if (userRepository.findByEmail(email).isEmpty()) {
-            return "If this e-mail is registered, we sent a code.";
+            return;
         }
 
-        Instant now = Instant.now();
         OtpState otp = otpStateRepository.load(email).orElseGet(OtpState::empty);
 
+        Instant now = Instant.now();
         if (otp.hasOtp() && !otp.isOtpExpired(now)) {
-            // Active code present: idempotent no-op
             log.info("OTP already active for {} — no-op", email);
-            return "Code already sent. Check your e-mail.";
+            return;
         }
 
         String code = generateCode();
@@ -75,10 +74,9 @@ public class OtpService implements OtpServiceInt {
         try {
             emailService.sendVerificationEmail(email, code);
             log.info("OTP generated for {}", email);
-            return "Verification code sent. Check your e-mail.";
         } catch (RuntimeException ex) {
             otpStateRepository.delete(email);
-            log.warn("Failed to send OTP email. Cleaned up Redis entry for {}", email, ex);
+            log.warn("Failed to send OTP to email {}", email, ex);
             throw ex;
         }
     }

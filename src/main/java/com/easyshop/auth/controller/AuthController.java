@@ -39,14 +39,8 @@ public class AuthController {
 
     @PostMapping(value = "/send-verification-code", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<com.easyshop.auth.model.dto.error.ErrorResponse> sendVerificationCode(@Valid @RequestBody OtpSendDto dto) {
-        String detail = otpService.generateOtp(dto.getEmail());
-        var body = ErrorResponse.builder()
-                .detail(detail)
-                .status("ACCEPTED")
-                .statusCode(202)
-                .path("/api/auth/send-verification-code")
-                .build();
-        return ResponseEntity.accepted().body(body);
+        otpService.generateOtp(dto.getEmail());
+        return ResponseEntity.accepted().build();
     }
 
     @PostMapping(value = "/verify-code", consumes = MediaType.APPLICATION_JSON_VALUE)
