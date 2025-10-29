@@ -5,11 +5,11 @@ import com.easyshop.auth.model.dto.OtpSendDto;
 import com.easyshop.auth.model.dto.PasswordResetDto;
 import com.easyshop.auth.model.dto.VerifyCodeDto;
 import com.easyshop.auth.model.dto.VerifyCodeResponseDto;
-import com.easyshop.auth.model.dto.error.ErrorResponse;
 import com.easyshop.auth.service.AuthServiceInt;
 import com.easyshop.auth.service.OtpServiceInt;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -33,14 +33,22 @@ public class AuthController {
 
     @PostMapping(value = "/register", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<Void> register(@Valid @RequestBody AuthDto dto) {
-        authService.register(dto);
-        return ResponseEntity.accepted().build();
+        long cooldownSeconds = authService.register(dto);
+        ResponseEntity.BodyBuilder builder = ResponseEntity.accepted();
+        if (cooldownSeconds > 0) {
+            builder.header(HttpHeaders.RETRY_AFTER, String.valueOf(cooldownSeconds));
+        }
+        return builder.build();
     }
 
     @PostMapping(value = "/send-code", consumes = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<com.easyshop.auth.model.dto.error.ErrorResponse> sendVerificationCode(@Valid @RequestBody OtpSendDto dto) {
-        otpService.generateOtp(dto.getEmail());
-        return ResponseEntity.accepted().build();
+    public ResponseEntity<Void> sendVerificationCode(@Valid @RequestBody OtpSendDto dto) {
+        long cooldownSeconds = otpService.generateOtp(dto.getEmail());
+        ResponseEntity.BodyBuilder builder = ResponseEntity.accepted();
+        if (cooldownSeconds > 0) {
+            builder.header(HttpHeaders.RETRY_AFTER, String.valueOf(cooldownSeconds));
+        }
+        return builder.build();
     }
 
     @PostMapping(value = "/verify-code", consumes = MediaType.APPLICATION_JSON_VALUE)

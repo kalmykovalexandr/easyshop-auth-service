@@ -31,7 +31,7 @@ public class AuthService implements AuthServiceInt {
 
     @Override
     @Transactional
-    public void register(AuthDto dto) {
+    public long register(AuthDto dto) {
         String email = dto.getEmail();
 
         User user = userRepository.findByEmail(email).orElse(null);
@@ -46,15 +46,16 @@ public class AuthService implements AuthServiceInt {
 
             user.setPassword(encodedPwd);
             userRepository.save(user);
-            otpService.generateOtp(email);
+            long cooldown = otpService.generateOtp(email, true);
             log.info("Registration resumed for {}.", email);
-            return;
+            return cooldown;
         }
 
         // First-time registration
         userRepository.save(User.from(dto, encodedPwd, false));
-        otpService.generateOtp(email);
+        long cooldown = otpService.generateOtp(email, true);
         log.info("Registration started for {}.", email);
+        return cooldown;
     }
 
     @Override

@@ -1,58 +1,96 @@
-Auth flows и UI‑правила (консолидировано)
+Auth flows & UI rules (consolidated)
 
-Общие правила
-- Ответы сервера на неверные учётные данные всегда generic, без раскрытия причины.
-- UI‑сообщения берутся из messages.properties (login.errors.* и др.).
-- Ошибки на Sign in очищаются только при правке e‑mail или пароля пользователем.
+General rules
+- Server responses for invalid credentials are always generic; no reason is revealed.
+- All UI strings come from `messages.properties` (e.g. `login.errors.*`).
+- Sign-in errors disappear only after the user edits the e-mail or password fields.
+- External clients (Postman, mobile, etc.) must receive the same status codes and payloads as our UI.
+- Successful POST `/api/auth/register` and POST `/api/auth/send-code` include a `Retry-After` header (seconds until the next resend); the UI arms the “Send again” timer with that value.
 
-Sign in — сценарии
-1) Успешный вход (enabled=true)
-- Действия: валидные e‑mail + пароль → Sign in.
-- Ожидание (UI): редирект на защищённый маршрут, без параметра error.
-- Ожидание (Backend): 302/успешная аутентификация через DaoAuthenticationProvider.
+Sign in — scenarios
+1) Successful sign-in (`enabled = true`)
+- Action: valid e-mail + password → Sign in.
+- UI: redirect to the protected route, no `error` query parameter.
+- Backend: standard Spring Security login via `DaoAuthenticationProvider` (302 → target).
 
-2) Неверные данные (неверный e‑mail или пароль)
-- Действия: неверные e‑mail/пароль → Sign in.
-- Ожидание (UI): баннер «Invalid e‑mail or password. Try again.»; не исчезает сам, только при вводе в e‑mail/пароль.
-- Ожидание (Backend): 302 → /login?error=credentials (одинаково для любых неверных комбинаций; так же из Postman/form POST).
+2) Invalid credentials
+- Action: wrong e-mail and/or password.
+- UI: banner “Invalid e-mail or password. Try again.”; persists until the field changes.
+- Backend: 302 → `/login?error=credentials` (same for any bad combination, including form posts).
 
-3) Аккаунт не подтверждён (disabled)
-- Действия: попытка входа неактивного пользователя.
-- Ожидание (UI): /login?error=disabled, автопоказ модалки OTP с корректным e‑mail.
-- Ensure: фронт один раз вызывает POST /api/auth/ensure-verification-code (fire‑and‑forget).
-- Подтверждение: «Confirm» → POST /api/auth/verify-code; «Send again» → POST /api/auth/send-code (учитывает cooldown).
-- После успешной верификации параметр error удаляется из URL, баннер скрывается.
+3) Account not verified (`enabled = false`)
+- Action: user tries to sign in before confirming e-mail.
+- UI: redirect to `/login?error=disabled`, OTP modal opens with the stored e-mail.
+- Ensure: frontend fires POST `/api/auth/send-code` once (fire-and-forget) to make sure a code exists.
+- Confirm: “Confirm” → POST `/api/auth/verify-code`; “Send again” → POST `/api/auth/send-code` (cooldown enforced).
+- Success: after verification the `error` parameter is removed from the URL and the banner hides.
 
-4) Клиентская валидация формы Sign in (до запроса на сервер)
-- Пустые поля (одно/оба): баннер «Fill all fields.»; фокус в первое незаполненное поле.
-- Неверный формат e‑mail: «Enter a valid e‑mail address.»; фокус в e‑mail.
-- Только при валидных e‑mail и пароле форма отправляется на сервер.
+4) Client-side validation (before hitting backend)
+- Empty fields (one or both): “Fill all fields.” with focus on the first empty control.
+- Invalid e-mail format: “Enter a valid e-mail address.” and focus on the e-mail input.
+- Only a valid pair of e-mail/password submits the form to the server.
 
-Правило для «глазка» (переключатель видимости пароля)
-- Показать кнопку только когда поле пароля в фокусе И в нём есть непустое значение.
-- Скрыть кнопку, если поле пустое или потеряло фокус.
-- Применяется ко всем полям пароля в сервисе (Sign in, Forgot/Reset и т.п.).
+Password “eye” toggle rule
+- Show the toggle only when the password input is focused and non-empty.
+- Hide the toggle when the field is empty or loses focus.
+- Apply the same behaviour to Sign in, Register, Forgot/Reset views.
 
-Сценарии регистрации
+Registration scenarios
 
-1) Успешная регистрация (включая повторную)
-- Ввожу корректный формат и несуществующий e‑mail, корректный пароль и его подтверждение.
-- Вызываю /api/auth/register на backend.
-- Бэкенд проверяет, существует ли уже пользователь с таким e‑mail.
-- Если пользователь существует, но ещё не подтверждён (повторная регистрация):
-  - Генерируем и отправляем OTP-код на почту только если в Redis нет активного кода (предыдущий истёк/удалён).
-  - Если активный OTP-код есть в Redis, новый код не отправляем (no-op).
-- На фронтенде в модальном окне ввода OTP всегда показывается одно и то же сообщение «Проверьте почту», независимо от того, отправили новый код или нет.
-- Аккаунт создаётся успешно.
+1. Fresh registration (success)
+- User enters valid e-mail, strong password, confirmation.
+- Frontend sends POST `/api/auth/register`.
+- Backend creates user with `enabled=false`, generates OTP, sends e-mail, and returns `Retry-After`.
+- UI opens the OTP modal, disables “Send again”, and starts the countdown using `Retry-After`.
+- User submits the code; POST `/api/auth/verify-code` with `activateUser=true` returns `204`, account becomes active.
 
-2) Успешная регистрация с повторной отправкой otp кода
-- Ввожу корректный формат и несуществующий e‑mail, корректный пароль и его подтверждение.
-- Вызываю /api/auth/register на backend.
-- Бэкенд проверяет, существует ли уже пользователь с таким e‑mail.
-- Пользователь запрашивает повторный otp code и вызывает send-code
+2. Repeat registration for an unverified user
+- E-mail already exists but `enabled=false`.
+- Backend updates the password and calls `generateOtp(email, true)`.
+- Active code from Redis is re-sent immediately; only `cooldownUntil` is refreshed (OTP expiry stays the same).
+- UI receives `Retry-After`, restarts the timer, and user gets the same code in a fresh e-mail.
 
-- Если пользователь существует, но ещё не подтверждён (повторная регистрация):
-  - Генерируем и отправляем OTP-код на почту только если в Redis нет активного кода (предыдущий истёк/удалён).
-  - Если активный OTP-код есть в Redis, новый код не отправляем (no-op).
-- На фронтенде в модальном окне ввода OTP всегда показывается одно и то же сообщение «Проверьте почту», независимо от того, отправили новый код или нет.
-- Аккаунт создаётся успешно.
+3. Registration with a verified e-mail
+- Condition: user exists with `enabled=true`.
+- Result: `BusinessException(EMAIL_ALREADY_USED)` → 409/422 response.
+- UI shows “Email is already registered”.
+
+4. Registration with invalid form data
+- Issues: invalid e-mail, weak password, mismatched passwords.
+- Bean Validation (`AuthDto`) raises 400 with field errors (`EMAIL_INVALID`, `PASSWORD_WEAK`, `PASSWORDS_DO_NOT_MATCH`).
+- UI highlights fields and stops before OTP generation.
+
+5. Resend OTP before cooldown expires
+- User presses “Send again” while `cooldownUntil > now`.
+- POST `/api/auth/send-code` throws `RateLimitExceededException` → 429 with `Retry-After`.
+- UI shows “Please wait {0} seconds…” and keeps the button disabled until the timer finishes.
+
+6. Resend OTP after cooldown (OTP still valid)
+- Cooldown finished, OTP not expired.
+- Backend re-sends the same code, refreshes `cooldownUntil`, returns 202 + `Retry-After`.
+- UI shows “We sent a new verification code.” and restarts the timer with the returned value.
+
+7. Resend after OTP expiry
+- `otpExpiresAt < now` when the user presses “Send again”.
+- Backend generates a new code, saves state, sends e-mail, returns 202 + `Retry-After`.
+- Old code becomes invalid; UI message remains the same but the modal now expects the new code.
+
+8. Wrong OTP during confirmation
+- User submits an incorrect code.
+- `/api/auth/verify-code` responds 400 with `VERIFICATION_CODE_INVALID`, increments attempts.
+- UI shows “Verification failed. Try again.”
+
+9. OTP expired during confirmation
+- User submits the code after `otpExpiresAt`.
+- Backend clears state and replies 410 `VERIFICATION_CODE_EXPIRED`.
+- UI prompts user to request a new code and re-enables “Send again”.
+
+10. Too many OTP attempts
+- User exceeds `verification-max-attempts` with wrong codes.
+- State is cleared; backend returns 400 `TOO_MANY_VERIFICATION_ATTEMPTS`.
+- UI shows a warning and prompts to resend a code.
+
+11. Confirmation without an active OTP
+- Redis entry is absent (cleanup job, TTL expired, code never requested).
+- `/api/auth/verify-code` returns 404 `VERIFICATION_CODE_NOT_FOUND`.
+- UI shows “Request a new verification code” and focuses on resend.

@@ -53,18 +53,39 @@ public class OtpService implements OtpServiceInt {
     }
 
     @Override
-    public void generateOtp(String email) {
+    public long generateOtp(String email) {
+        return generateOtp(email, false);
+    }
+
+    @Override
+    public long generateOtp(String email, boolean forceResend) {
         // If user does not exist, do not send anything (avoid enumeration/spam)
         if (userRepository.findByEmail(email).isEmpty()) {
-            return;
+            return resendCooldown.getSeconds();
         }
 
+        Instant now = Instant.now();
         OtpState otp = otpStateRepository.load(email).orElseGet(OtpState::empty);
 
-        Instant now = Instant.now();
         if (otp.hasOtp() && !otp.isOtpExpired(now)) {
-            log.info("OTP already active for {} — no-op", email);
-            return;
+            if (!forceResend) {
+                enforceCooldown(otp, now);
+            }
+
+            String code = otp.getCode();
+            if (code != null && !code.isBlank()) {
+                OtpState updated = otp.withCooldownUntil(now.plus(resendCooldown));
+                otpStateRepository.save(email, updated, now);
+                try {
+                    emailService.sendVerificationEmail(email, code);
+                    log.info("OTP re-sent for {}", email);
+                } catch (RuntimeException ex) {
+                    otpStateRepository.save(email, otp, now);
+                    log.warn("Failed to resend OTP to email {}", email, ex);
+                    throw ex;
+                }
+                return resendCooldown.getSeconds();
+            }
         }
 
         String code = generateCode();
@@ -79,6 +100,7 @@ public class OtpService implements OtpServiceInt {
             log.warn("Failed to send OTP to email {}", email, ex);
             throw ex;
         }
+        return resendCooldown.getSeconds();
     }
 
     @Override

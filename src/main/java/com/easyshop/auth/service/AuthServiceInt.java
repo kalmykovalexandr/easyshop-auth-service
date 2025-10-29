@@ -5,6 +5,6 @@ import com.easyshop.auth.model.dto.AuthDto;
 import com.easyshop.auth.model.dto.PasswordResetDto;
 
 public interface AuthServiceInt {
-    void register(AuthDto dto);
+    long register(AuthDto dto);
     void resetPassword(PasswordResetDto request);
 }

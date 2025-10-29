@@ -26,6 +26,7 @@
   const otpInput = otpModal?.querySelector('[data-otp-input]')
   const otpMessage = otpModal?.querySelector('[data-otp-message]')
   const otpDescription = otpModal?.querySelector('[data-otp-description]')
+  const otpResendButton = otpModal?.querySelector('[data-action="otp-resend"]')
 
   const registerSuccessModal = document.querySelector('[data-modal="register-success"]')
   const forgotEmailModal = document.querySelector('[data-modal="forgot-email"]')
@@ -297,6 +298,11 @@
     const original = button.dataset.originalText || button.textContent
     button.dataset.originalText = original
 
+    if (resendTimer) {
+      window.clearInterval(resendTimer)
+      resendTimer = null
+    }
+
     const update = () => {
       if (remaining <= 0) {
         button.disabled = false
@@ -409,6 +415,11 @@
           return
         }
 
+        const retryAfter = response.headers.get('Retry-After')
+        if (retryAfter && otpResendButton) {
+          startCooldown(otpResendButton, Number(retryAfter))
+        }
+
         if (!otpModalOpened && otpModal) {
           registerEmail = (email || '')
           if (otpDescription) {
@@ -424,7 +435,14 @@
           fetchJson('/api/auth/send-code', {
             method: 'POST',
             body: JSON.stringify({ email: registerEmail })
-          }).catch(() => {})
+          })
+            .then(({ response: resendResponse }) => {
+              const resendRetryAfter = resendResponse.headers.get('Retry-After')
+              if (resendRetryAfter && otpResendButton) {
+                startCooldown(otpResendButton, Number(resendRetryAfter))
+              }
+            })
+            .catch(() => {})
         }
       } catch (error) {
         if (otpModalOpened) {
@@ -761,7 +779,14 @@
         fetchJson('/api/auth/send-code', {
           method: 'POST',
           body: JSON.stringify({ email: emailToUse })
-        }).catch(() => {})
+        })
+          .then(({ response: ensureResponse }) => {
+            const ensureRetryAfter = ensureResponse.headers.get('Retry-After')
+            if (ensureRetryAfter && otpResendButton) {
+              startCooldown(otpResendButton, Number(ensureRetryAfter))
+            }
+          })
+          .catch(() => {})
       }
     }
   } catch (e) {
