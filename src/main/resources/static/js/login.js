@@ -584,7 +584,6 @@
           showMessage(otpMessage, message)
           return
         }
-        showMessage(otpMessage, getMessage('otpResendSuccess', 'We sent a new code.'), 'success')
         applyCooldownFromPayload(button, payload, response.headers.get('Retry-After'))
       } catch (error) {
         showMessage(otpMessage, getMessage('otpError', 'Could not resend the code. Try later.'))
@@ -742,7 +741,6 @@
           showMessage(forgotCodeMessage, message)
           return
         }
-        showMessage(forgotCodeMessage, getMessage('otpResendSuccess', 'We sent a new code.'), 'success')
         applyCooldownFromPayload(button, payload, response.headers.get('Retry-After'))
       } catch (error) {
         showMessage(forgotCodeMessage, getMessage('genericError', 'Could not resend the code.'))

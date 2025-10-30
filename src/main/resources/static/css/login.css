@@ -399,12 +399,16 @@ body.auth-modal-open {
 }
 
 .auth-modal__actions {
-  display: grid;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
   gap: 12px;
+  margin-top: 4px;
 }
 
 .auth-otp-resend-wrapper {
-  margin-top: 12px;
+  margin-top: 4px;
+  margin-bottom: 2px;
   text-align: center;
 }
 
@@ -412,33 +416,38 @@ body.auth-modal-open {
   border: none;
   background: transparent;
   padding: 0;
-  margin: 0;
+  margin: 0 auto;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  justify-content: center;
+  gap: 4px;
   font: inherit;
-  font-size: 0.875rem;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-  color: #4f46e5;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+  color: #6b7280;
   cursor: pointer;
   text-decoration: none;
-  border-bottom: 1px solid rgba(79, 70, 229, 0.28);
-  padding-bottom: 2px;
-  transition: color 0.2s ease-in-out, border-color 0.2s ease-in-out;
+  transition: color 0.2s ease-in-out, text-decoration-color 0.2s ease-in-out;
 }
 
 .auth-otp-resend:disabled,
 .auth-otp-resend--disabled {
-  color: #9ca3af;
-  border-bottom-color: transparent;
+  color: #6b7280;
+  opacity: 0.9;
   cursor: default;
+  pointer-events: none;
   text-decoration: none;
 }
 
+.auth-otp-resend:not(:disabled) {
+  color: #4f46e5;
+}
+
 .auth-otp-resend:not(:disabled):hover {
-  color: #3730a3;
-  border-bottom-color: rgba(55, 48, 163, 0.35);
+  color: #4338ca;
+  text-decoration: underline;
 }
 
 .auth-modal__status {
