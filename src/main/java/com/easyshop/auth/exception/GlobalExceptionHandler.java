@@ -11,7 +11,6 @@ import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.env.Environment;
 import org.springframework.dao.DataAccessException;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -148,6 +147,7 @@ public class GlobalExceptionHandler {
         // Add retry-after for rate limit exceptions
         if (ex instanceof RateLimitExceededException rateLimitEx) {
             builder.retryAfterSeconds((long) rateLimitEx.getRetryAfterSeconds());
+            builder.cooldownUntil(rateLimitEx.getCooldownUntil());
         }
 
         ErrorResponse response = builder.build();
@@ -157,14 +157,6 @@ public class GlobalExceptionHandler {
             log.error("Business exception at {}: {}", request.getRequestURI(), ex.getMessage(), ex);
         } else {
             log.warn("Business exception at {}: {} - {}", request.getRequestURI(), errorCode, ex.getMessage());
-        }
-
-        // Add Retry-After header for rate limiting
-        if (ex instanceof RateLimitExceededException rateLimitEx) {
-            return ResponseEntity
-                    .status(httpStatus)
-                    .header(HttpHeaders.RETRY_AFTER, String.valueOf(rateLimitEx.getRetryAfterSeconds()))
-                    .body(response);
         }
 
         return ResponseEntity.status(httpStatus).body(response);

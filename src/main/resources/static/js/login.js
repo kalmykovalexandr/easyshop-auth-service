@@ -15,6 +15,7 @@
     signin: card?.dataset?.signinTitle || document.title,
     register: card?.dataset?.registerTitle || document.title
   }
+  const defaultResendCooldown = Number(card?.dataset?.resendCooldown) || 0
 
   const i18nStore = document.querySelector('[data-i18n-store]')
   const messages = i18nStore ? { ...i18nStore.dataset } : {}
@@ -262,17 +263,36 @@
     })
   })
 
+  const messageTimers = new WeakMap()
+
   function showMessage(container, text, type = 'error') {
     if (!container) return
+    const existingTimer = messageTimers.get(container)
+    if (existingTimer) {
+      window.clearTimeout(existingTimer)
+      messageTimers.delete(container)
+    }
     container.textContent = text
     container.hidden = false
     container.setAttribute('aria-hidden', 'false')
     container.classList.remove('auth-message--error', 'auth-message--success')
     container.classList.add(type === 'success' ? 'auth-message--success' : 'auth-message--error')
+
+    if (type === 'success') {
+      const timeoutId = window.setTimeout(() => {
+        clearMessage(container)
+      }, 5000)
+      messageTimers.set(container, timeoutId)
+    }
   }
 
   function clearMessage(container) {
     if (!container) return
+    const existingTimer = messageTimers.get(container)
+    if (existingTimer) {
+      window.clearTimeout(existingTimer)
+      messageTimers.delete(container)
+    }
     container.textContent = ''
     container.hidden = true
     container.setAttribute('aria-hidden', 'true')
@@ -293,31 +313,99 @@
 
   function startCooldown(button, seconds) {
     if (!button) return
-    let remaining = Math.max(Number(seconds) || 0, 0)
-    button.disabled = true
-    const original = button.dataset.originalText || button.textContent
-    button.dataset.originalText = original
+    let remaining = Math.max(Math.round(Number(seconds) || 0), 0)
+    const originalLabel = button.dataset.label || button.dataset.originalText || button.textContent || ''
+    const countdownTemplate = button.dataset.countdown || `${originalLabel} ({0})`
+    button.dataset.originalText = originalLabel
 
     if (resendTimer) {
       window.clearInterval(resendTimer)
       resendTimer = null
     }
 
-    const update = () => {
+    const tick = () => {
       if (remaining <= 0) {
         button.disabled = false
-        button.textContent = original
-        if (resendTimer) {
-          window.clearInterval(resendTimer)
-          resendTimer = null
-        }
-        return
+        button.textContent = originalLabel
+        button.classList.remove('auth-otp-resend--disabled')
+        return false
       }
-      button.textContent = `${original} (${remaining}s)`
+      button.disabled = true
+      button.textContent = countdownTemplate.replace('{0}', formatCooldown(remaining))
+      button.classList.add('auth-otp-resend--disabled')
       remaining -= 1
+      return true
     }
-    update()
-    resendTimer = window.setInterval(update, 1000)
+
+    if (!tick()) {
+      return
+    }
+
+    resendTimer = window.setInterval(() => {
+      if (!tick()) {
+        window.clearInterval(resendTimer)
+        resendTimer = null
+      }
+    }, 1000)
+  }
+
+  function extractCooldownSeconds(payload) {
+    if (!payload || typeof payload !== 'object') {
+      return defaultResendCooldown
+    }
+
+    const candidates = []
+    const rawSeconds = payload.cooldownSeconds ?? payload.retryAfterSeconds
+    if (rawSeconds !== undefined && rawSeconds !== null && rawSeconds !== '') {
+      const parsed = Number(rawSeconds)
+      if (Number.isFinite(parsed)) {
+        candidates.push(parsed)
+      }
+    }
+
+    if (payload.cooldownUntil) {
+      const parsedUntil = Date.parse(payload.cooldownUntil)
+      if (!Number.isNaN(parsedUntil)) {
+        const diff = Math.ceil((parsedUntil - Date.now()) / 1000)
+        if (Number.isFinite(diff)) {
+          candidates.push(diff)
+        }
+      }
+    }
+
+    if (candidates.length === 0) {
+      return defaultResendCooldown
+    }
+
+    return Math.max(0, Math.max(...candidates))
+  }
+
+  function resolveCooldownSeconds(payload, fallbackHeader) {
+    const fromPayload = extractCooldownSeconds(payload)
+    if (fromPayload > 0) {
+      return fromPayload
+    }
+    const fromHeader = Number(fallbackHeader)
+    if (Number.isFinite(fromHeader) && fromHeader > 0) {
+      return fromHeader
+    }
+    return 0
+  }
+
+  function applyCooldownFromPayload(button, payload, fallbackHeader) {
+    if (!button) return
+    const seconds = resolveCooldownSeconds(payload, fallbackHeader)
+    startCooldown(button, seconds)
+  }
+
+  function formatCooldown(seconds) {
+    const total = Math.max(0, Math.round(seconds))
+    const minutes = Math.floor(total / 60)
+    const secs = total % 60
+    if (minutes > 0) {
+      return `${minutes}:${String(secs).padStart(2, '0')} sec`
+    }
+    return `${secs} sec`
   }
 
   if (registerForm) {
@@ -328,25 +416,30 @@
       const emailInput = registerForm.querySelector('input[name="email"]')
       const passwordInput = registerForm.querySelector('input[name="password"]')
       const confirmInput = registerForm.querySelector('input[name="confirmPassword"]')
+      const submitButton = registerForm.querySelector('[type="submit"]')
 
       const email = emailInput?.value?.trim() || ''
       const password = passwordInput?.value || ''
       const confirmPassword = confirmInput?.value || ''
 
-      if (!email) {
-        showMessage(registerError, registerForm.dataset.errorEmail || 'Enter a valid e-mail.')
-        emailInput?.focus()
+      if (!email || !password || !confirmPassword) {
+        const fillMsg =
+          registerForm.dataset.errorFill ||
+          registerForm.dataset.errorEmail ||
+          'Fill all fields.'
+        showMessage(registerError, fillMsg)
+        if (!email) {
+          emailInput?.focus()
+        } else if (!password) {
+          passwordInput?.focus()
+        } else {
+          confirmInput?.focus()
+        }
         return
       }
       if (!isEmailValid(email)) {
         showMessage(registerError, registerForm.dataset.errorEmail || getMessage('register.errors.email', 'Enter a valid e-mail.'))
         emailInput?.focus()
-        return
-      }
-
-      if (!password) {
-        showMessage(registerError, registerForm.dataset.errorPassword || 'Enter a password.')
-        passwordInput?.focus()
         return
       }
 
@@ -362,32 +455,14 @@
         return
       }
 
-      let otpModalOpened = false
-      if (otpModal) {
-        registerEmail = (email || '')
-        if (otpDescription) {
-          const template = otpDescription.dataset.template || otpDescription.textContent || ''
-          otpDescription.textContent = format(template, registerEmail)
-        }
-        if (otpInput) {
-          otpInput.value = ''
-        }
-        clearMessage(otpMessage)
-        openModal(otpModal)
-        otpModalOpened = true
-      }
-
       try {
+        submitButton?.setAttribute('disabled', 'disabled')
         const { response, payload } = await fetchJson('/api/auth/register', {
           method: 'POST',
           body: JSON.stringify({ email, password, confirmPassword })
         })
 
         if (!response.ok) {
-          if (otpModalOpened) {
-            closeModal(otpModal)
-            registerEmail = ''
-          }
           const errors = payload?.errors || {}
           const errorCode = payload?.errorCode
           if (errors.email === 'EMAIL_INVALID' || errors.email === 'EMAIL_REQUIRED' || errorCode === 'EMAIL_INVALID' || errorCode === 'EMAIL_REQUIRED') {
@@ -395,12 +470,12 @@
             emailInput?.focus()
             return
           }
-          if (errors.password === 'PASSWORD_WEAK' || errors.password === 'PASSWORD_REQUIRED') {
+          if (errors.password === 'PASSWORD_WEAK' || errors.password === 'PASSWORD_REQUIRED' || errorCode === 'PASSWORD_WEAK' || errorCode === 'PASSWORD_REQUIRED') {
             showMessage(registerError, registerForm.dataset.errorPassword || getMessage('register.errors.password', 'Password does not meet requirements.'))
             passwordInput?.focus()
             return
           }
-          if (errors.confirmPassword === 'PASSWORDS_DO_NOT_MATCH') {
+          if (errors.confirmPassword === 'PASSWORDS_DO_NOT_MATCH' || errorCode === 'PASSWORDS_DO_NOT_MATCH') {
             showMessage(registerError, registerForm.dataset.errorMismatch || getMessage('register.errors.mismatch', 'Passwords do not match.'))
             confirmInput?.focus()
             return
@@ -415,13 +490,10 @@
           return
         }
 
-        const retryAfter = response.headers.get('Retry-After')
-        if (retryAfter && otpResendButton) {
-          startCooldown(otpResendButton, Number(retryAfter))
-        }
+        registerEmail = email
+        otpEmail = email
 
-        if (!otpModalOpened && otpModal) {
-          registerEmail = (email || '')
+        if (otpModal) {
           if (otpDescription) {
             const template = otpDescription.dataset.template || otpDescription.textContent || ''
             otpDescription.textContent = format(template, registerEmail)
@@ -431,30 +503,21 @@
           }
           clearMessage(otpMessage)
           openModal(otpModal)
-          // ensure при открытии модалки после успешной регистрации
-          fetchJson('/api/auth/send-code', {
-            method: 'POST',
-            body: JSON.stringify({ email: registerEmail })
-          })
-            .then(({ response: resendResponse }) => {
-              const resendRetryAfter = resendResponse.headers.get('Retry-After')
-              if (resendRetryAfter && otpResendButton) {
-                startCooldown(otpResendButton, Number(resendRetryAfter))
-              }
-            })
-            .catch(() => {})
+          if (otpResendButton) {
+            applyCooldownFromPayload(otpResendButton, payload, response.headers.get('Retry-After'))
+          }
         }
       } catch (error) {
-        if (otpModalOpened) {
-          closeModal(otpModal)
-          registerEmail = ''
-        }
         showMessage(registerError, registerForm.dataset.errorGeneric || getMessage('genericError', 'Something went wrong. Try again later.'))
+      } finally {
+        submitButton?.removeAttribute('disabled')
       }
     })
   }
 
   if (otpModal) {
+    otpInput?.addEventListener('input', () => clearMessage(otpMessage))
+
     otpModal.querySelector('[data-action="otp-submit"]')?.addEventListener('click', async () => {
       const code = otpInput?.value?.trim() || ''
       if (!code || !/^\d{8}$/.test(code)) {
@@ -509,10 +572,12 @@
           body: JSON.stringify({ email: emailToUse })
         })
         if (!response.ok) {
-          const retryAfter = response.headers.get('Retry-After')
-          if (response.status === 429 && retryAfter) {
-            showMessage(otpMessage, getMessage('otpResendWait', 'Please wait {0} seconds before requesting again.').replace('{0}', retryAfter))
-            startCooldown(button, Number(retryAfter))
+          if (response.status === 429) {
+            const waitSeconds = resolveCooldownSeconds(payload, response.headers.get('Retry-After'))
+            showMessage(otpMessage, getMessage('otpResendWait', 'Please wait {0} seconds before requesting again.').replace('{0}', waitSeconds))
+            if (waitSeconds > 0) {
+              startCooldown(button, waitSeconds)
+            }
             return
           }
           const message = (payload && payload.detail) || getMessage('otpError', 'Could not resend the code. Try later.')
@@ -520,7 +585,7 @@
           return
         }
         showMessage(otpMessage, getMessage('otpResendSuccess', 'We sent a new code.'), 'success')
-        startCooldown(button, Number(response.headers.get('Retry-After')))
+        applyCooldownFromPayload(button, payload, response.headers.get('Retry-After'))
       } catch (error) {
         showMessage(otpMessage, getMessage('otpError', 'Could not resend the code. Try later.'))
       }
@@ -607,6 +672,8 @@
   }
 
   if (forgotCodeModal) {
+    forgotCodeInput?.addEventListener('input', () => clearMessage(forgotCodeMessage))
+
     forgotCodeModal.querySelector('[data-action="forgot-verify"]')?.addEventListener('click', async () => {
       clearMessage(forgotCodeMessage)
       const code = forgotCodeInput?.value?.trim() || ''
@@ -663,10 +730,12 @@
           body: JSON.stringify({ email: forgotEmail })
         })
         if (!response.ok) {
-          const retryAfter = response.headers.get('Retry-After')
-          if (response.status === 429 && retryAfter) {
-            showMessage(forgotCodeMessage, getMessage('otpResendWait', 'Please wait {0} seconds before requesting again.').replace('{0}', retryAfter))
-            startCooldown(button, Number(retryAfter))
+          if (response.status === 429) {
+            const waitSeconds = resolveCooldownSeconds(payload, response.headers.get('Retry-After'))
+            showMessage(forgotCodeMessage, getMessage('otpResendWait', 'Please wait {0} seconds before requesting again.').replace('{0}', waitSeconds))
+            if (waitSeconds > 0) {
+              startCooldown(button, waitSeconds)
+            }
             return
           }
           const message = (payload && payload.detail) || getMessage('genericError', 'Could not resend the code.')
@@ -674,7 +743,7 @@
           return
         }
         showMessage(forgotCodeMessage, getMessage('otpResendSuccess', 'We sent a new code.'), 'success')
-        startCooldown(button, Number(response.headers.get('Retry-After')))
+        applyCooldownFromPayload(button, payload, response.headers.get('Retry-After'))
       } catch (error) {
         showMessage(forgotCodeMessage, getMessage('genericError', 'Could not resend the code.'))
       }
@@ -780,10 +849,15 @@
           method: 'POST',
           body: JSON.stringify({ email: emailToUse })
         })
-          .then(({ response: ensureResponse }) => {
-            const ensureRetryAfter = ensureResponse.headers.get('Retry-After')
-            if (ensureRetryAfter && otpResendButton) {
-              startCooldown(otpResendButton, Number(ensureRetryAfter))
+          .then(({ response: ensureResponse, payload: ensurePayload }) => {
+            if (!ensureResponse.ok) {
+              if (ensureResponse.status === 429 && otpResendButton) {
+                applyCooldownFromPayload(otpResendButton, ensurePayload, ensureResponse.headers.get('Retry-After'))
+              }
+              return
+            }
+            if (otpResendButton) {
+              applyCooldownFromPayload(otpResendButton, ensurePayload, ensureResponse.headers.get('Retry-After'))
             }
           })
           .catch(() => {})
@@ -793,4 +867,5 @@
     // no-op
   }
 })()
+
 

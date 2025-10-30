@@ -4,6 +4,7 @@ import com.easyshop.auth.exception.BusinessException;
 import com.easyshop.auth.exception.ErrorCode;
 import com.easyshop.auth.exception.RateLimitExceededException;
 import com.easyshop.auth.model.OtpState;
+import com.easyshop.auth.model.dto.OtpSendResultDto;
 import com.easyshop.auth.model.dto.VerifyCodeDto;
 import com.easyshop.auth.model.dto.VerifyCodeResponseDto;
 import com.easyshop.auth.model.entity.User;
@@ -53,18 +54,22 @@ public class OtpService implements OtpServiceInt {
     }
 
     @Override
-    public long generateOtp(String email) {
+    public OtpSendResultDto generateOtp(String email) {
         return generateOtp(email, false);
     }
 
     @Override
-    public long generateOtp(String email, boolean forceResend) {
+    public OtpSendResultDto generateOtp(String email, boolean forceResend) {
         // If user does not exist, do not send anything (avoid enumeration/spam)
+        Instant now = Instant.now();
         if (userRepository.findByEmail(email).isEmpty()) {
-            return resendCooldown.getSeconds();
+            return OtpSendResultDto.builder()
+                    .cooldownSeconds(resendCooldown.getSeconds())
+                    .cooldownUntil(now.plus(resendCooldown))
+                    .otpStatus("ignored")
+                    .build();
         }
 
-        Instant now = Instant.now();
         OtpState otp = otpStateRepository.load(email).orElseGet(OtpState::empty);
 
         if (otp.hasOtp() && !otp.isOtpExpired(now)) {
@@ -84,7 +89,7 @@ public class OtpService implements OtpServiceInt {
                     log.warn("Failed to resend OTP to email {}", email, ex);
                     throw ex;
                 }
-                return resendCooldown.getSeconds();
+                return buildResult(updated, Instant.now(), "resent");
             }
         }
 
@@ -100,7 +105,7 @@ public class OtpService implements OtpServiceInt {
             log.warn("Failed to send OTP to email {}", email, ex);
             throw ex;
         }
-        return resendCooldown.getSeconds();
+        return buildResult(updated, Instant.now(), "generated");
     }
 
     @Override
@@ -187,7 +192,7 @@ public class OtpService implements OtpServiceInt {
             return;
         }
         long retryAfter = state.getCooldownUntil().getEpochSecond() - now.getEpochSecond();
-        throw new RateLimitExceededException((int) Math.max(1, retryAfter));
+        throw new RateLimitExceededException((int) Math.max(1, retryAfter), state.getCooldownUntil());
     }
 
     private String generateResetToken() {
@@ -197,5 +202,17 @@ public class OtpService implements OtpServiceInt {
     private String generateCode() {
         int value = secureRandom.nextInt(90_000_000) + 10_000_000;
         return Integer.toString(value);
+    }
+
+    private OtpSendResultDto buildResult(OtpState state, Instant now, String status) {
+        Instant cooldownUntil = state.getCooldownUntil();
+        long remaining = cooldownUntil != null
+                ? Math.max(0, cooldownUntil.getEpochSecond() - now.getEpochSecond())
+                : resendCooldown.getSeconds();
+        return OtpSendResultDto.builder()
+                .cooldownSeconds(remaining)
+                .cooldownUntil(cooldownUntil)
+                .otpStatus(status)
+                .build();
     }
 }

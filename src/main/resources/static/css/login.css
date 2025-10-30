@@ -403,6 +403,44 @@ body.auth-modal-open {
   gap: 12px;
 }
 
+.auth-otp-resend-wrapper {
+  margin-top: 12px;
+  text-align: center;
+}
+
+.auth-otp-resend {
+  border: none;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: #4f46e5;
+  cursor: pointer;
+  text-decoration: none;
+  border-bottom: 1px solid rgba(79, 70, 229, 0.28);
+  padding-bottom: 2px;
+  transition: color 0.2s ease-in-out, border-color 0.2s ease-in-out;
+}
+
+.auth-otp-resend:disabled,
+.auth-otp-resend--disabled {
+  color: #9ca3af;
+  border-bottom-color: transparent;
+  cursor: default;
+  text-decoration: none;
+}
+
+.auth-otp-resend:not(:disabled):hover {
+  color: #3730a3;
+  border-bottom-color: rgba(55, 48, 163, 0.35);
+}
+
 .auth-modal__status {
   width: 56px;
   height: 56px;

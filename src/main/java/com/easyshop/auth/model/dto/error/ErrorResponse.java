@@ -92,6 +92,9 @@ public class ErrorResponse {
     @JsonInclude(JsonInclude.Include.NON_NULL)
     private Long retryAfterSeconds;
 
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private Instant cooldownUntil;
+
     /**
      * Debug message with technical details.
      * Only included in development/staging environments.

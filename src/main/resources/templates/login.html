@@ -13,7 +13,8 @@
     <div class="auth-card"
          data-mode="signin"
          th:attr="data-signin-title=#{login.meta.title.signin},
-                 data-register-title=#{login.meta.title.register}">
+                 data-register-title=#{login.meta.title.register},
+                 data-resend-cooldown=${@environment.getProperty('easyshop.auth.verification-resend-cooldown-seconds','120')}">
 
         <!-- Sign in -->
         <section class="auth-view auth-view--signin" data-view="signin">
@@ -86,6 +87,7 @@
                   th:attr="data-error-email=#{register.errors.email},
                            data-error-password=#{register.errors.password},
                            data-error-mismatch=#{register.errors.mismatch},
+                           data-error-fill=#{register.errors.fillAll},
                            data-error-generic=#{register.errors.generic},
                            data-success-title=#{register.success.title},
                            data-success-message=#{register.success.message}">
@@ -159,12 +161,18 @@
                        th:attr="placeholder=#{otp.modal.placeholder}">
             </label>
             <div class="auth-message" data-otp-message hidden aria-hidden="true"></div>
+            <p class="auth-otp-resend-wrapper">
+                <button type="button"
+                        class="auth-otp-resend"
+                        data-action="otp-resend"
+                        th:attr="data-label=#{otp.modal.resendReady}, data-countdown=#{otp.modal.countdown}">
+                    <span th:text="#{otp.modal.resendReady}">Resend code</span>
+                </button>
+            </p>
         </div>
         <div class="auth-modal__actions">
             <button type="button" class="auth-button auth-button--primary" data-action="otp-submit"
                     th:text="#{otp.modal.confirm}">Confirm</button>
-            <button type="button" class="auth-button auth-button--secondary" data-action="otp-resend"
-                    th:text="#{otp.modal.resend}">Send again</button>
         </div>
     </div>
 </section>
@@ -227,12 +235,18 @@
                        th:attr="placeholder=#{otp.modal.placeholder}">
             </label>
             <div class="auth-message" data-forgot-code-message hidden aria-hidden="true"></div>
+            <p class="auth-otp-resend-wrapper">
+                <button type="button"
+                        class="auth-otp-resend"
+                        data-action="forgot-resend"
+                        th:attr="data-label=#{otp.modal.resendReady}, data-countdown=#{otp.modal.countdown}">
+                    <span th:text="#{otp.modal.resendReady}">Resend code</span>
+                </button>
+            </p>
         </div>
         <div class="auth-modal__actions">
             <button type="button" class="auth-button auth-button--primary" data-action="forgot-verify"
                     th:text="#{forgot.code.submit}">Verify code</button>
-            <button type="button" class="auth-button auth-button--secondary" data-action="forgot-resend"
-                    th:text="#{otp.modal.resend}">Send again</button>
         </div>
     </div>
 </section>

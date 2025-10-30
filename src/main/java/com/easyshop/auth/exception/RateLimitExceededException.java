@@ -1,5 +1,6 @@
 package com.easyshop.auth.exception;
 
+import java.time.Instant;
 import lombok.Getter;
 
 /**
@@ -10,9 +11,11 @@ import lombok.Getter;
 public class RateLimitExceededException extends BusinessException {
 
     private final int retryAfterSeconds;
+    private final Instant cooldownUntil;
 
-    public RateLimitExceededException(int retryAfterSeconds) {
+    public RateLimitExceededException(int retryAfterSeconds, Instant cooldownUntil) {
         super(ErrorCode.RATE_LIMIT_EXCEEDED, retryAfterSeconds);
         this.retryAfterSeconds = retryAfterSeconds;
+        this.cooldownUntil = cooldownUntil;
     }
 }

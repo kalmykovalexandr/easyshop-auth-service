@@ -3,6 +3,7 @@ package com.easyshop.auth.service.impl;
 import com.easyshop.auth.exception.BusinessException;
 import com.easyshop.auth.exception.ErrorCode;
 import com.easyshop.auth.model.dto.AuthDto;
+import com.easyshop.auth.model.dto.OtpSendResultDto;
 import com.easyshop.auth.model.dto.PasswordResetDto;
 import com.easyshop.auth.model.entity.User;
 import com.easyshop.auth.repository.UserRepository;
@@ -31,7 +32,7 @@ public class AuthService implements AuthServiceInt {
 
     @Override
     @Transactional
-    public long register(AuthDto dto) {
+    public OtpSendResultDto register(AuthDto dto) {
         String email = dto.getEmail();
 
         User user = userRepository.findByEmail(email).orElse(null);
@@ -46,16 +47,16 @@ public class AuthService implements AuthServiceInt {
 
             user.setPassword(encodedPwd);
             userRepository.save(user);
-            long cooldown = otpService.generateOtp(email, true);
+            OtpSendResultDto result = otpService.generateOtp(email, true);
             log.info("Registration resumed for {}.", email);
-            return cooldown;
+            return result;
         }
 
         // First-time registration
         userRepository.save(User.from(dto, encodedPwd, false));
-        long cooldown = otpService.generateOtp(email, true);
+        OtpSendResultDto result = otpService.generateOtp(email, true);
         log.info("Registration started for {}.", email);
-        return cooldown;
+        return result;
     }
 
     @Override

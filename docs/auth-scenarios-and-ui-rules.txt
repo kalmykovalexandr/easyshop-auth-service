@@ -1,11 +1,11 @@
-Auth flows & UI rules (consolidated)
+﻿Auth flows & UI rules (consolidated)
 
 General rules
 - Server responses for invalid credentials stay generic; we never disclose which field was wrong.
 - All UI strings come from `messages.properties` (for example `login.errors.*`).
 - Sign-in error banners clear only after the user edits the e-mail or password input.
 - External clients (Postman, mobile, etc.) must receive the same HTTP status codes and payloads as the web UI.
-- Successful POST `/api/auth/register` and POST `/api/auth/send-code` include a `Retry-After` header (seconds until the next resend); the UI arms the “Send again” timer with that value.
+- Successful POST `/api/auth/register` and POST `/api/auth/send-code` respond with JSON `{ cooldownSeconds, cooldownUntil, otpStatus }`; the UI reads the returned cooldown values to drive the “Send again” timer.
 
 Sign in — scenarios
 1) Successful sign-in (enabled user)
@@ -22,7 +22,7 @@ Sign in — scenarios
 3) Account not verified (`enabled=false`)
 - Action: user submits correct credentials for an unverified account.
 - Backend: failure handler routes to `/login?error=disabled`, storing the username for reuse.
-- UI: OTP modal opens automatically with the stored e-mail. Frontend fires POST `/api/auth/send-code` once to ensure an OTP exists; if the response carries `Retry-After`, the resend timer starts immediately. After successful OTP confirmation (`POST /api/auth/verify-code` with `activateUser=true` → 204), the modal closes, the success modal appears, and the user can sign in normally.
+- UI: OTP modal opens automatically with the stored e-mail. The �Send again� button is disabled right away using the configured default cooldown, and once the POST `/api/auth/send-code` response returns with the cooldown payload, the timer syncs to that value. After successful OTP confirmation (`POST /api/auth/verify-code` with `activateUser=true` → 204), the modal closes, the success modal appears, and the user can sign in normally.
 - Resend, cooldown, and invalid-OTP behaviour during this flow equal the registration scenarios 6–12.
 
 4) Client-side validation and empty fields
@@ -39,14 +39,14 @@ Registration scenarios
 
 1. Fresh registration (success)
 - User enters valid e-mail, strong password, and confirmation; frontend sends POST `/api/auth/register`.
-- Backend creates user with `enabled=false`, generates OTP, sends e-mail, returns 202 with `Retry-After`.
-- UI opens the OTP modal, disables “Send again”, and starts the countdown using `Retry-After`.
+- Backend creates user with `enabled=false`, generates OTP, sends e-mail, returns 202 with the cooldown payload.
+- UI opens the OTP modal, disables “Send again”, and starts the countdown using `cooldownSeconds`.
 - User submits the code; POST `/api/auth/verify-code` with `activateUser=true` returns 204 and the account becomes active.
 
 2. Repeat registration for an unverified user
 - E-mail already exists but `enabled=false`.
 - Backend updates the password and calls `generateOtp(email, true)`.
-- Active code from Redis is re-sent immediately; only `cooldownUntil` is refreshed (OTP expiry stays the same). Response still contains `Retry-After`.
+- Active code from Redis is re-sent immediately; only `cooldownUntil` is refreshed (OTP expiry stays the same). Response still contains the cooldown payload.
 - UI restarts the resend timer; the user receives the same code in a fresh e-mail.
 
 3. Registration with a verified e-mail
@@ -66,17 +66,17 @@ Registration scenarios
 
 6. Resend OTP before cooldown expires
 - User presses “Send again” while `cooldownUntil > now`.
-- POST `/api/auth/send-code` throws `RateLimitExceededException` → 429 with `Retry-After`.
+- POST `/api/auth/send-code` throws `RateLimitExceededException` → 429 with the cooldown payload.
 - UI shows “Please wait {0} seconds...” and keeps the button disabled until the timer completes.
 
 7. Resend OTP after cooldown (OTP still valid)
 - Cooldown finished, OTP not expired.
-- Backend re-sends the same code, refreshes `cooldownUntil`, returns 202 with `Retry-After`.
+- Backend re-sends the same code, refreshes `cooldownUntil`, returns 202 with the cooldown payload.
 - UI shows “We sent a new verification code.” and restarts the timer using the returned value.
 
 8. Resend after OTP expiry
 - `otpExpiresAt < now` when the user presses “Send again”.
-- Backend generates a new code, persists it, sends e-mail, returns 202 with `Retry-After`.
+- Backend generates a new code, persists it, sends e-mail, returns 202 with the cooldown payload.
 - Old code becomes invalid; the modal message remains generic but expects the new code.
 
 9. Wrong OTP during confirmation
@@ -98,3 +98,10 @@ Registration scenarios
 - Redis entry is absent (cleanup job, TTL expired, or code never generated).
 - `/api/auth/verify-code` returns 404 `VERIFICATION_CODE_NOT_FOUND`.
 - UI shows “Request a new verification code” and focuses on resend.
+
+
+
+
+
+
+

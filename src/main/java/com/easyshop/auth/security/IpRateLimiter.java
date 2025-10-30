@@ -49,7 +49,7 @@ public class IpRateLimiter {
             int retryAfter = remaining != null && remaining > 0
                     ? remaining.intValue()
                     : (int) window.getSeconds();
-            throw new RateLimitExceededException(retryAfter);
+            throw new RateLimitExceededException(retryAfter, null);
         }
     }
 
