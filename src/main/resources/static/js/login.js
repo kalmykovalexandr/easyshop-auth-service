@@ -38,6 +38,7 @@
   const forgotCodeInput = forgotCodeModal?.querySelector('[data-forgot-code-input]')
   const forgotCodeMessage = forgotCodeModal?.querySelector('[data-forgot-code-message]')
   const forgotCodeDescription = forgotCodeModal?.querySelector('[data-forgot-code-description]')
+  const forgotResendButton = forgotCodeModal?.querySelector('[data-action="forgot-resend"]')
 
   const forgotResetModal = document.querySelector('[data-modal="forgot-reset"]')
   const forgotPasswordInput = forgotResetModal?.querySelector('[data-forgot-password-input]')
@@ -311,8 +312,25 @@
     return { response, payload }
   }
 
+  function markResendPending(button) {
+    if (!button) return
+    button.dataset.resendBusy = 'true'
+    button.disabled = true
+    button.classList.add('auth-otp-resend--disabled')
+  }
+
+  function resetResendButton(button) {
+    if (!button) return
+    delete button.dataset.resendBusy
+    const originalLabel = button.dataset.label || button.dataset.originalText || button.textContent || ''
+    button.disabled = false
+    button.textContent = originalLabel
+    button.classList.remove('auth-otp-resend--disabled')
+  }
+
   function startCooldown(button, seconds) {
     if (!button) return
+    delete button.dataset.resendBusy
     let remaining = Math.max(Math.round(Number(seconds) || 0), 0)
     const originalLabel = button.dataset.label || button.dataset.originalText || button.textContent || ''
     const countdownTemplate = button.dataset.countdown || `${originalLabel} ({0})`
@@ -504,6 +522,7 @@
           clearMessage(otpMessage)
           openModal(otpModal)
           if (otpResendButton) {
+            markResendPending(otpResendButton)
             applyCooldownFromPayload(otpResendButton, payload, response.headers.get('Retry-After'))
           }
         }
@@ -558,6 +577,9 @@
 
     otpModal.querySelector('[data-action="otp-resend"]')?.addEventListener('click', async (event) => {
       const button = event.currentTarget
+      if (button?.dataset?.resendBusy === 'true' || button?.disabled) {
+        return
+      }
       const params = new URLSearchParams(window.location.search || '')
       const isDisabled = params.get('error') === 'disabled'
       const emailToUse = isDisabled ? (otpEmail || '') : (registerEmail || '')
@@ -565,6 +587,7 @@
         showMessage(otpMessage, getMessage('otpError', 'Registration session expired.'))
         return
       }
+      markResendPending(button)
       clearMessage(otpMessage)
       try {
         const { response, payload } = await fetchJson('/api/auth/send-code', {
@@ -577,16 +600,20 @@
             showMessage(otpMessage, getMessage('otpResendWait', 'Please wait {0} seconds before requesting again.').replace('{0}', waitSeconds))
             if (waitSeconds > 0) {
               startCooldown(button, waitSeconds)
+            } else {
+              resetResendButton(button)
             }
             return
           }
           const message = (payload && payload.detail) || getMessage('otpError', 'Could not resend the code. Try later.')
           showMessage(otpMessage, message)
+          resetResendButton(button)
           return
         }
         applyCooldownFromPayload(button, payload, response.headers.get('Retry-After'))
       } catch (error) {
         showMessage(otpMessage, getMessage('otpError', 'Could not resend the code. Try later.'))
+        resetResendButton(button)
       }
     })
   }
@@ -616,6 +643,9 @@
           forgotCodeInput.value = ''
         }
         clearMessage(forgotCodeMessage)
+        if (forgotResendButton) {
+          markResendPending(forgotResendButton)
+        }
         openModal(forgotCodeModal)
         codeModalOpened = true
       }
@@ -656,6 +686,9 @@
             forgotCodeInput.value = ''
           }
           clearMessage(forgotCodeMessage)
+          if (forgotResendButton) {
+            markResendPending(forgotResendButton)
+          }
           openModal(forgotCodeModal)
         }
       } catch (error) {
@@ -718,10 +751,14 @@
 
     forgotCodeModal.querySelector('[data-action="forgot-resend"]')?.addEventListener('click', async (event) => {
       const button = event.currentTarget
+      if (button?.dataset?.resendBusy === 'true' || button?.disabled) {
+        return
+      }
       if (!forgotEmail) {
         showMessage(forgotCodeMessage, getMessage('forgotCodeError', 'Session expired. Start over.'))
         return
       }
+      markResendPending(button)
       clearMessage(forgotCodeMessage)
       try {
         const { response, payload } = await fetchJson('/api/auth/send-code', {
@@ -734,16 +771,20 @@
             showMessage(forgotCodeMessage, getMessage('otpResendWait', 'Please wait {0} seconds before requesting again.').replace('{0}', waitSeconds))
             if (waitSeconds > 0) {
               startCooldown(button, waitSeconds)
+            } else {
+              resetResendButton(button)
             }
             return
           }
           const message = (payload && payload.detail) || getMessage('genericError', 'Could not resend the code.')
           showMessage(forgotCodeMessage, message)
+          resetResendButton(button)
           return
         }
         applyCooldownFromPayload(button, payload, response.headers.get('Retry-After'))
       } catch (error) {
         showMessage(forgotCodeMessage, getMessage('genericError', 'Could not resend the code.'))
+        resetResendButton(button)
       }
     })
   }
@@ -839,6 +880,9 @@
       }
       clearMessage(otpMessage)
       openModal(otpModal)
+      if (otpResendButton) {
+        markResendPending(otpResendButton)
+      }
 
       // Ensure there is a valid code: send new only if absent/expired (fire-and-forget)
       const emailToUse = otpEmail || signinForm?.querySelector('input[name="username"]')?.value || ''

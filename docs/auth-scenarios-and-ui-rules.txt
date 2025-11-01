@@ -5,7 +5,8 @@ General rules
 - All UI strings come from `messages.properties` (for example `login.errors.*`).
 - Sign-in error banners clear only after the user edits the e-mail or password input.
 - External clients (Postman, mobile, etc.) must receive the same HTTP status codes and payloads as the web UI.
-- Successful POST `/api/auth/register` and POST `/api/auth/send-code` respond with JSON `{ cooldownSeconds, cooldownUntil, otpStatus }`; the UI reads the returned cooldown values to drive the “Send again” timer.
+- Successful POST `/api/auth/register` and POST `/api/auth/send-code` respond with JSON `{ cooldownSeconds, cooldownUntil, otpStatus }`; the UI reads the returned cooldown values to drive the "Send again" timer.
+- Any web form with required e-mail/password/confirm-password fields (sign-in, registration, forgot-password) shows "Fill all fields." when one or more fields are empty. The message disappears when the user focuses the missing input.
 
 Sign in — scenarios
 1) Successful sign-in (enabled user)
@@ -34,6 +35,13 @@ Sign in — scenarios
 5) Remember last username
 - After any failed sign-in the backend stores `SPRING_SECURITY_LAST_USERNAME`; `LoginController` injects it into the login template so the UI pre-fills the e-mail field on the next visit.
 - Clearing inputs or succeeding later does not automatically blank the field; the user must overwrite it manually.
+
+6) Sign-in with unverified registration (pending OTP)
+- Prerequisite: user completed registration but has not verified the e-mail (`enabled=false`).
+- Action: user submits correct e-mail/password via `/login`.
+- Backend: authentication fails with `DisabledException`; failure handler redirects to `/login?error=disabled` and stores the username.
+- UI: on page load detects `error=disabled`, opens the OTP modal with the stored e-mail, sends `/api/auth/send-code` (respects cooldown payload), and guides the user through code verification. After successful `POST /api/auth/verify-code` (`activateUser=true`), account becomes active and subsequent sign-in succeeds.
+- If the password is incorrect, the backend responds with the generic credentials error instead of opening the OTP modal.
 
 Registration scenarios
 
@@ -72,7 +80,7 @@ Registration scenarios
 7. Resend OTP after cooldown (OTP still valid)
 - Cooldown finished, OTP not expired.
 - Backend re-sends the same code, refreshes `cooldownUntil`, returns 202 with the cooldown payload.
-- UI shows “We sent a new verification code.” and restarts the timer using the returned value.
+- UI молча перезапускает таймер по новым значениям; дополнительных уведомлений не показываем.
 
 8. Resend after OTP expiry
 - `otpExpiresAt < now` when the user presses “Send again”.

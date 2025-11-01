@@ -1,6 +1,7 @@
 package com.easyshop.auth.config;
 
 import com.easyshop.auth.security.AccountStatusAuthenticationFailureHandler;
+import com.easyshop.auth.security.DeferredAccountStatusDaoAuthenticationProvider;
 import com.easyshop.auth.service.DatabaseUserDetailsService;
 import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.RSAKey;
@@ -148,7 +149,7 @@ public class AuthSecurityConfig {
     @Bean
     public DaoAuthenticationProvider authenticationProvider(DatabaseUserDetailsService userDetailsService,
                                                             PasswordEncoder passwordEncoder) {
-        DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
+        DaoAuthenticationProvider authProvider = new DeferredAccountStatusDaoAuthenticationProvider();
         authProvider.setUserDetailsService(userDetailsService);
         authProvider.setPasswordEncoder(passwordEncoder);
         return authProvider;
