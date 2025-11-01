@@ -52,7 +52,7 @@
                 </label>
                 <div class="auth-message auth-message--error"
                      data-signin-error
-                     th:if="${loginErrorCode} != null"
+                     th:attr="hidden=${loginErrorCode == null}, aria-hidden=${loginErrorCode == null}"
                      th:text="${loginErrorCode} == 'disabled' ? #{login.errors.disabled} : #{login.errors.credentials}">
                     Invalid e-mail or password.
                 </div>

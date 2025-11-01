@@ -167,6 +167,7 @@
 
   root.querySelectorAll('[data-action="show-register"]').forEach((button) => {
     button.addEventListener('click', () => {
+      removeErrorParam()
       setMode('register')
       registerForm?.querySelector('input[name="email"]')?.focus()
     })
