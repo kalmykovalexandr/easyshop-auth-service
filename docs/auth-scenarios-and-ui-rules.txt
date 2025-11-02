@@ -1,116 +1,156 @@
-﻿Auth flows & UI rules (consolidated)
+Auth Flows & UI Rules (structured)
 
 General rules
-- Server responses for invalid credentials stay generic; we never disclose which field was wrong.
-- All UI strings come from `messages.properties` (for example `login.errors.*`).
-- Sign-in error banners clear only after the user edits the e-mail or password input.
-- External clients (Postman, mobile, etc.) must receive the same HTTP status codes and payloads as the web UI.
-- Successful POST `/api/auth/register` and POST `/api/auth/send-code` respond with JSON `{ cooldownSeconds, cooldownUntil, otpStatus }`; the UI reads the returned cooldown values to drive the "Send again" timer.
-- Any web form with required e-mail/password/confirm-password fields (sign-in, registration, forgot-password) shows "Fill all fields." when one or more fields are empty. The message disappears when the user focuses the missing input.
-- Visible error banners auto-dismiss ~7 seconds after they appear and also disappear immediately when the user focuses any field or switches between sign-in / registration screens.
+- All user-facing strings come from messages.properties.
+- The backend never reveals which credential field is wrong; error payloads stay generic.
+- Web UI and external clients (Postman, mobile, etc.) must receive identical HTTP statuses and bodies.
+- POST /api/auth/register and POST /api/auth/send-code respond with `{ cooldownSeconds, cooldownUntil, otpStatus }`; the UI uses these values to drive the resend timer.
+- Any form with mandatory email/password/confirm-password fields (sign-in, registration, forgot password) shows "Fill all fields." when one or more inputs are empty. The banner disappears when the user focuses the missing field.
+- Visible banners (errors or success messages) auto-dismiss roughly after 7 seconds or immediately when the user focuses an input or switches between sign-in and registration.
+- Any visible error banner clears immediately once the user clicks within the auth widget or switches to another flow (sign-in/registration/forgot-password).
 
-Sign in — scenarios
-1) Successful sign-in (enabled user)
-- Action: user submits valid credentials via the form or direct POST `/login`.
-- Backend: Spring Security authenticates, issues 302 to the success URL (`/` by default), session established.
-- UI: browser follows the redirect; there is no `error` parameter in the URL.
+----------------------------------------------------------------------
+Sign-in scenarios
 
-2) Invalid credentials or locked account
-- Action: e-mail not found, wrong password, or `accountNonLocked=false`.
-- Backend: redirects to `/login?error=credentials`, persists the last attempted username in the session.
-- UI: banner “Invalid e-mail or password. Try again.” appears; it stays until the user edits the e-mail or password field.
-- External clients receive the same redirect/response body as the browser (generic message only).
+SI-01: Empty form
+- Preconditions: user is on `/login`.
+- Steps:
+  1. Leave email and password empty.
+  2. Click "Sign in".
+- Expected result:
+  - Client-side validation blocks the submission.
+  - Banner "Fill all fields." stays visible and focus moves to the email field.
+  - No network request is executed.
 
-3) Account not verified (`enabled=false`)
-- Action: user submits correct credentials for an unverified account.
-- Backend: failure handler routes to `/login?error=disabled`, storing the username for reuse.
-- UI: OTP modal opens automatically with the stored e-mail. The �Send again� button is disabled right away using the configured default cooldown, and once the POST `/api/auth/send-code` response returns with the cooldown payload, the timer syncs to that value. After successful OTP confirmation (`POST /api/auth/verify-code` with `activateUser=true` → 204), the modal closes, the success modal appears, and the user can sign in normally.
-- Resend, cooldown, and invalid-OTP behaviour during this flow equal the registration scenarios 6–12.
+SI-02: Missing password
+- Preconditions: `/login`.
+- Steps: enter a valid email, leave password empty, click "Sign in".
+- Expected result: "Fill all fields." appears, focus returns to the password field, no request is sent.
 
-4) Client-side validation and empty fields
-- Empty e-mail, empty password, or both: submit is blocked with “Fill all fields.” and focus moves to the first missing input.
-- Invalid e-mail format: submit is blocked with “Enter a valid e-mail address.” and focus returns to the e-mail field.
-- Only when all checks pass does the form submit to `/login`.
-- Direct POST `/login` with missing fields (Postman, etc.) receives the same backend response as the UI would after validation (`/login?error=credentials`).
+SI-03: Missing email
+- Preconditions: `/login`.
+- Steps: enter a password, leave email empty, click "Sign in".
+- Expected result: "Fill all fields." appears, focus returns to the password field, no request is sent.
 
-5) Remember last username
-- After any failed sign-in the backend stores `SPRING_SECURITY_LAST_USERNAME`; `LoginController` injects it into the login template so the UI pre-fills the e-mail field on the next visit.
-- Clearing inputs or succeeding later does not automatically blank the field; the user must overwrite it manually.
+SI-04: Invalid email format
+- Steps: enter a non-email string plus password, click "Sign in".
+- Expected result: "Enter a valid e-mail address.", focus returns to the email field; the browser does not submit.
 
-6) Sign-in with unverified registration (pending OTP)
-- Prerequisite: user completed registration but has not verified the e-mail (`enabled=false`).
-- Action: user submits correct e-mail/password via `/login`.
-- Backend: authentication fails with `DisabledException`; failure handler redirects to `/login?error=disabled` and stores the username.
-- UI: on page load detects `error=disabled`, opens the OTP modal with the stored e-mail, sends `/api/auth/send-code` (respects cooldown payload), and guides the user through code verification. After successful `POST /api/auth/verify-code` (`activateUser=true`), account becomes active and subsequent sign-in succeeds.
-- If the password is incorrect, the backend responds with the generic credentials error instead of opening the OTP modal.
+SI-05: Successful sign-in (enabled user)
+- Preconditions: account exists, `enabled=true`.
+- Steps: supply valid credentials, click "Sign in".
+- Expected result: Spring Security issues 302 to the success URL; the resulting page has no `error` query parameter.
 
+SI-06: Invalid credentials or locked account
+- Preconditions: wrong credentials or `accountNonLocked=false`.
+- Expected result: backend redirects to `/login?error=credentials`, stores last username; UI shows "Invalid e-mail or password. Try again." until the user edits an input.
+
+SI-07: Unverified account, correct password
+- Preconditions: account exists, `enabled=false`, password is correct.
+- Steps: submit credentials.
+- Expected result: backend throws `DisabledException`, redirects to `/login?error=disabled`;
+  UI opens the OTP modal, disables resend, calls `/api/auth/send-code`,
+  and syncs the timer using the response. After successful `verify-code` (`activateUser=true`) the account becomes enabled and the next sign-in follows SI-05.
+
+SI-08: Unverified account, wrong password
+- Preconditions: same as SI-07 but the password is wrong.
+- Expected result: backend returns `/login?error=credentials`, OTP modal is not shown; UI displays the generic banner.
+
+SI-09: Remember last username
+- Preconditions: at least one failed sign-in happened earlier.
+- Expected result: `/login` renders with `SPRING_SECURITY_LAST_USERNAME` pre-filled; user may overwrite it manually.
+
+----------------------------------------------------------------------
 Registration scenarios
 
-1. Fresh registration (success)
-- User enters valid e-mail, strong password, and confirmation; frontend sends POST `/api/auth/register`.
-- Backend creates user with `enabled=false`, generates OTP, sends e-mail, returns 202 with the cooldown payload.
-- UI opens the OTP modal, disables “Send again”, and starts the countdown using `cooldownSeconds`.
-- User submits the code; POST `/api/auth/verify-code` with `activateUser=true` returns 204 and the account becomes active.
+RG-01: Fresh registration (success)
+- Preconditions: email not present in the system.
+- Steps: submit valid email plus strong password and confirmation.
+- Expected result: backend creates user with `enabled=false`, generates OTP, returns 202 with cooldown info; UI opens the OTP modal, disables resend, starts the countdown; successful `verify-code` with `activateUser=true` activates the account.
 
-2. Repeat registration for an unverified user
-- E-mail already exists but `enabled=false`.
-- Backend updates the password and calls `generateOtp(email, true)`.
-- Active code from Redis is re-sent immediately; only `cooldownUntil` is refreshed (OTP expiry stays the same). Response still contains the cooldown payload.
-- UI restarts the resend timer; the user receives the same code in a fresh e-mail.
+RG-02: Repeat registration for unverified user
+- Preconditions: user exists, `enabled=false`, OTP still stored (regenerated if expired).
+- Steps: register again with the same email.
+- Expected result: password is updated; if an OTP is still valid it is resent (otherwise regenerated). Cooldown values are refreshed and the UI restarts the timer without extra banners.
 
-3. Registration with a verified e-mail
-- Condition: user exists with `enabled=true`.
-- Result: `BusinessException(EMAIL_ALREADY_USED)` → 409/422 response.
-- UI shows “Email is already registered”.
+RG-03: Registration for already verified email
+- Preconditions: user exists, `enabled=true`.
+- Expected result: backend returns `EMAIL_ALREADY_USED` (409/422); UI shows "Email is already registered".
 
-4. Registration with empty fields
-- Cases: empty e-mail, empty password, empty confirmPassword, or all empty.
-- UI (client validation): shows “Fill all fields.”, focusing the first missing input; the request is blocked.
-- External clients (Postman) receive 400 with `EMAIL_REQUIRED`, `PASSWORD_REQUIRED`, etc., plus the generic top-level message.
+RG-04: Missing required fields
+- Steps: leave one or more required inputs empty and click submit.
+- Expected result: "Fill all fields.", focus on the first missing input, no request is sent; API callers receive 400 with `*_REQUIRED` codes.
 
-5. Registration with invalid form data
-- Issues: invalid e-mail format, weak password, passwords do not match.
-- Bean Validation returns 400 with field errors (`EMAIL_INVALID`, `PASSWORD_WEAK`, `PASSWORDS_DO_NOT_MATCH`).
-- UI highlights fields and does not proceed to OTP generation.
+RG-05: Invalid form data
+- Cases: invalid email format (`EMAIL_INVALID`), weak password (`PASSWORD_WEAK`), password mismatch (`PASSWORDS_DO_NOT_MATCH`).
+- Expected result: backend returns 400 with detailed codes; UI highlights fields and does not open the OTP modal.
 
-6. Resend OTP before cooldown expires
-- User presses “Send again” while `cooldownUntil > now`.
-- POST `/api/auth/send-code` throws `RateLimitExceededException` → 429 with the cooldown payload.
-- UI shows “Please wait {0} seconds...” and keeps the button disabled until the timer completes.
+RG-06: Resend OTP before cooldown expires
+- Steps: press "Resend OTP" while the timer > 0.
+- Expected result: `/api/auth/send-code` returns 429 with cooldown payload; UI shows "Please wait {0} seconds..." and keeps the button disabled until countdown ends.
 
-7. Resend OTP after cooldown (OTP still valid)
-- Cooldown finished, OTP not expired.
-- Backend re-sends the same code, refreshes `cooldownUntil`, returns 202 with the cooldown payload.
-- UI молча перезапускает таймер по новым значениям; дополнительных уведомлений не показываем.
+RG-07: Resend OTP after cooldown (OTP still valid)
+- Preconditions: cooldown finished, OTP not expired.
+- Expected result: backend resends the existing code, returns 202 with new cooldown; UI simply restarts the timer using returned values.
 
-8. Resend after OTP expiry
-- `otpExpiresAt < now` when the user presses “Send again”.
-- Backend generates a new code, persists it, sends e-mail, returns 202 with the cooldown payload.
-- Old code becomes invalid; the modal message remains generic but expects the new code.
+RG-08: Resend OTP after the code expired
+- Expected result: backend generates a new OTP, returns 202 with fresh cooldown; UI expects the new code from email.
 
-9. Wrong OTP during confirmation
-- User submits an incorrect code.
-- `/api/auth/verify-code` responds 400 with `VERIFICATION_CODE_INVALID`, incrementing the attempt counter.
-- UI shows “Verification failed. Try again.”
+RG-09: Wrong OTP during confirmation
+- Expected result: `/api/auth/verify-code` -> 400 `VERIFICATION_CODE_INVALID`; UI shows "Verification failed. Try again."
 
-10. OTP expired during confirmation
-- User submits the code after `otpExpiresAt`.
-- Backend clears state and returns 410 `VERIFICATION_CODE_EXPIRED`.
-- UI prompts the user to request a new code and re-enables “Send again”.
+RG-10: OTP expired during confirmation
+- Expected result: `/api/auth/verify-code` -> 410 `VERIFICATION_CODE_EXPIRED`; UI suggests requesting a new code and re-enables resend.
 
-11. Too many OTP attempts
-- User exceeds `verification-max-attempts` with wrong codes.
-- State is cleared; backend responds 400 `TOO_MANY_VERIFICATION_ATTEMPTS`.
-- UI displays a warning and offers the resend option.
+RG-11: Too many OTP attempts
+- Expected result: backend returns 400 `TOO_MANY_VERIFICATION_ATTEMPTS`; UI shows warning, resend remains governed by cooldown.
 
-12. Confirmation without an active OTP
-- Redis entry is absent (cleanup job, TTL expired, or code never generated).
-- `/api/auth/verify-code` returns 404 `VERIFICATION_CODE_NOT_FOUND`.
-- UI shows “Request a new verification code” and focuses on resend.
+RG-12: Confirmation without active OTP
+- Preconditions: Redis entry missing (cleanup/TTL).
+- Expected result: backend returns 404 `VERIFICATION_CODE_NOT_FOUND`; UI instructs the user to request a new code.
 
+----------------------------------------------------------------------
+Forgot password scenarios
 
+FP-01: Request reset with empty email
+- Steps: open "Forgot password", leave the input empty, click "Send code".
+- Expected result: "Enter a valid e-mail." and no request is made.
 
+FP-02: Request reset with invalid email
+- Steps: enter a malformed value, click "Send code".
+- Expected result: "Enter a valid e-mail.", no network call.
 
+FP-03: Request reset with valid email
+- Preconditions: user exists.
+- Steps: enter email, click "Send code".
+- Expected result: POST `/api/auth/send-code` -> 202 with cooldown; the code modal opens with resend disabled until the response arrives and the timer starts.
 
+FP-04: Empty code submission
+- Steps: in the code modal leave the input blank, click "Verify code".
+- Expected result: "Enter a valid code."
 
+FP-05: Wrong code
+- Expected result: `/api/auth/verify-code` -> 400 `VERIFICATION_CODE_INVALID`; UI shows failure banner.
 
+FP-06: Expired code
+- Expected result: `/api/auth/verify-code` -> 410 `VERIFICATION_CODE_EXPIRED`; UI prompts to request a new code.
+
+FP-07: Resend before cooldown
+- Steps: click "Resend OTP" before the timer finishes.
+- Expected result: backend responds 429 with cooldown payload; UI keeps the button disabled and updates the timer.
+
+FP-08: Resend after cooldown
+- Steps: wait for timer to finish, press "Resend OTP".
+- Expected result: backend returns 202 with new cooldown; UI restarts the timer immediately when the modal reopens or the response arrives.
+
+FP-09: Reset password form with empty fields
+- Steps: leave password or confirmation empty, click "Save password".
+- Expected result: "Fill in all fields."
+
+FP-10: Weak or mismatched password
+- Expected result: backend returns `PASSWORD_WEAK` or `PASSWORDS_DO_NOT_MATCH`; UI displays the corresponding message.
+
+FP-11: Successful password reset
+- Preconditions: valid resetToken.
+- Steps: enter new password plus confirmation, click "Save password".
+- Expected result: `/api/auth/reset-password` -> 204; UI shows the success modal and clears the token.

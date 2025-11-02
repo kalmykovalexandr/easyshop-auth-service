@@ -1,4 +1,4 @@
-﻿(function () {
+(function () {
   const root = document.querySelector('[data-auth-root]')
   if (!root) {
     return
@@ -46,6 +46,15 @@
   const forgotResetMessage = forgotResetModal?.querySelector('[data-forgot-reset-message]')
 
   const forgotSuccessModal = document.querySelector('[data-modal="forgot-success"]')
+
+  const messageContainers = [
+    signinError,
+    registerError,
+    otpMessage,
+    forgotEmailMessage,
+    forgotCodeMessage,
+    forgotResetMessage
+  ].filter(Boolean)
 
   let activeModal = null
   let registerEmail = ''
@@ -133,6 +142,7 @@
 
   document.querySelectorAll('[data-action="go-signin"]').forEach((button) => {
     button.addEventListener('click', () => {
+      clearAllMessages()
       closeAllModals()
       removeErrorParam()
       setMode('signin')
@@ -167,12 +177,35 @@
     }
   }
 
+  root.addEventListener(
+    'click',
+    (event) => {
+      if (event.isTrusted === false) {
+        return
+      }
+      clearAllMessages(true)
+    },
+    { capture: true }
+  )
+
+  root.addEventListener(
+    'focusin',
+    (event) => {
+      if (event.isTrusted === false) {
+        return
+      }
+      clearAllMessages()
+    },
+    { capture: true }
+  )
+
   if (signinError && !signinError.hidden && signinError.textContent && signinError.textContent.trim().length > 0) {
     showMessage(signinError, signinError.textContent.trim(), 'error')
   }
 
   root.querySelectorAll('[data-action="show-register"]').forEach((button) => {
     button.addEventListener('click', () => {
+      clearAllMessages()
       removeErrorParam()
       setMode('register')
       registerForm?.querySelector('input[name="email"]')?.focus()
@@ -181,6 +214,7 @@
 
   root.querySelectorAll('[data-action="show-signin"]').forEach((button) => {
     button.addEventListener('click', () => {
+      clearAllMessages()
       setMode('signin')
       signinForm?.querySelector('input[name="username"]')?.focus()
     })
@@ -189,6 +223,7 @@
   const forgotTriggers = root.querySelectorAll('[data-action="open-forgot"]')
   forgotTriggers.forEach((trigger) => {
     trigger.addEventListener('click', () => {
+      clearAllMessages()
       clearMessage(forgotEmailMessage)
       forgotEmailInput && (forgotEmailInput.value = '')
       openModal(forgotEmailModal)
@@ -218,7 +253,7 @@
       const email = emailInput?.value?.trim() || ''
       const password = passwordInput?.value || ''
 
-      // All fields empty or one empty → single fill-all message
+      // All fields empty or one empty ? single fill-all message
       if (!email || !password) {
         const fillMsg = signinForm.dataset.errorFill || signinForm.dataset.errorEmail || 'Fill all fields.'
         showMessage(signinError, fillMsg)
@@ -248,12 +283,12 @@
     if (!input) {
       button.classList.add('auth-field__toggle--hidden')
       return
+    button.classList.add('auth-field__toggle--hidden')
     }
 
     const updateToggleVisibility = () => {
       const hasValue = Boolean(input.value && input.value.length > 0)
       const focused = document.activeElement === input
-      // Показать «глаз» только когда поле в фокусе и есть значение
       button.classList.toggle('auth-field__toggle--hidden', !(focused && hasValue))
     }
 
@@ -290,6 +325,7 @@
     container.setAttribute('aria-hidden', 'false')
     container.classList.remove('auth-message--error', 'auth-message--success')
     container.classList.add(type === 'success' ? 'auth-message--success' : 'auth-message--error')
+    container.dataset.lastShownAt = String(Date.now())
 
     const autoHide = AUTO_HIDE_MS[type] || 0
     if (autoHide > 0) {
@@ -311,6 +347,30 @@
     container.hidden = true
     container.setAttribute('aria-hidden', 'true')
     container.classList.remove('auth-message--error', 'auth-message--success')
+    delete container.dataset.lastShownAt
+  }
+
+  const ERROR_CLEAR_DELAY_MS = 200
+
+  function isReadyToClear(container, now) {
+    const lastShownAt = Number(container?.dataset?.lastShownAt || 0)
+    if (!lastShownAt) {
+      return false
+    }
+    return now - lastShownAt >= ERROR_CLEAR_DELAY_MS
+  }
+
+  function clearAllMessages(force = false) {
+    const now = Date.now()
+    messageContainers.forEach((container) => {
+      if (!container || container.hidden) {
+        return
+      }
+      if (!force && !isReadyToClear(container, now)) {
+        return
+      }
+      clearMessage(container)
+    })
   }
 
   function attachAutoClearOnFocus(node, container) {
@@ -319,6 +379,10 @@
     }
     node.addEventListener('focusin', (event) => {
       if (event.isTrusted === false) {
+        return
+      }
+      const lastShownAt = Number(container.dataset.lastShownAt || 0)
+      if (lastShownAt && Date.now() - lastShownAt < 200) {
         return
       }
       clearMessage(container)
