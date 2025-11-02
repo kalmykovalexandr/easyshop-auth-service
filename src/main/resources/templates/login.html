@@ -52,8 +52,10 @@
                 </label>
                 <div class="auth-message auth-message--error"
                      data-signin-error
-                     th:attr="hidden=${loginErrorCode == null}, aria-hidden=${loginErrorCode == null}"
-                     th:text="${loginErrorCode} == 'disabled' ? #{login.errors.disabled} : #{login.errors.credentials}">
+                     th:attr="hidden=${loginErrorCode == null ? 'hidden' : null},
+                              aria-hidden=${loginErrorCode == null ? 'true' : 'false'}"
+                     th:text="${loginErrorCode} == null ? '' :
+                              (${loginErrorCode} == 'disabled' ? #{login.errors.disabled} : #{login.errors.credentials})">
                     Invalid e-mail or password.
                 </div>
                 <button type="submit" class="auth-button auth-button--primary" th:text="#{login.signin.submit}">Sign in</button>

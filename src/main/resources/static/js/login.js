@@ -154,15 +154,21 @@
       registerView?.setAttribute('aria-hidden', 'true')
       signinView?.removeAttribute('hidden')
       signinView?.setAttribute('aria-hidden', 'false')
+      clearMessage(registerError)
     } else {
       signinView?.setAttribute('hidden', 'true')
       signinView?.setAttribute('aria-hidden', 'true')
       registerView?.removeAttribute('hidden')
       registerView?.setAttribute('aria-hidden', 'false')
+      clearMessage(signinError)
     }
     if (titleStore[mode]) {
       document.title = titleStore[mode]
     }
+  }
+
+  if (signinError && !signinError.hidden && signinError.textContent && signinError.textContent.trim().length > 0) {
+    showMessage(signinError, signinError.textContent.trim(), 'error')
   }
 
   root.querySelectorAll('[data-action="show-register"]').forEach((button) => {
@@ -205,6 +211,7 @@
 
   // Sign-in client-side validation
   if (signinForm) {
+    attachAutoClearOnFocus(signinForm, signinError)
     signinForm.addEventListener('submit', (event) => {
       const emailInput = signinForm.querySelector('input[name="username"]')
       const passwordInput = signinForm.querySelector('input[name="password"]')
@@ -266,6 +273,10 @@
   })
 
   const messageTimers = new WeakMap()
+  const AUTO_HIDE_MS = {
+    success: 5000,
+    error: 7000
+  }
 
   function showMessage(container, text, type = 'error') {
     if (!container) return
@@ -280,10 +291,11 @@
     container.classList.remove('auth-message--error', 'auth-message--success')
     container.classList.add(type === 'success' ? 'auth-message--success' : 'auth-message--error')
 
-    if (type === 'success') {
+    const autoHide = AUTO_HIDE_MS[type] || 0
+    if (autoHide > 0) {
       const timeoutId = window.setTimeout(() => {
         clearMessage(container)
-      }, 5000)
+      }, autoHide)
       messageTimers.set(container, timeoutId)
     }
   }
@@ -299,6 +311,18 @@
     container.hidden = true
     container.setAttribute('aria-hidden', 'true')
     container.classList.remove('auth-message--error', 'auth-message--success')
+  }
+
+  function attachAutoClearOnFocus(node, container) {
+    if (!node || !container) {
+      return
+    }
+    node.addEventListener('focusin', (event) => {
+      if (event.isTrusted === false) {
+        return
+      }
+      clearMessage(container)
+    })
   }
 
   async function fetchJson(url, options = {}) {
@@ -428,6 +452,7 @@
   }
 
   if (registerForm) {
+    attachAutoClearOnFocus(registerForm, registerError)
     registerForm.addEventListener('submit', async (event) => {
       event.preventDefault()
       clearMessage(registerError)
@@ -536,6 +561,7 @@
   }
 
   if (otpModal) {
+    attachAutoClearOnFocus(otpModal, otpMessage)
     otpInput?.addEventListener('input', () => clearMessage(otpMessage))
 
     otpModal.querySelector('[data-action="otp-submit"]')?.addEventListener('click', async () => {
@@ -620,6 +646,7 @@
   }
 
   if (forgotEmailModal) {
+    attachAutoClearOnFocus(forgotEmailModal, forgotEmailMessage)
     forgotEmailModal.querySelector('[data-action="forgot-send"]')?.addEventListener('click', async () => {
       clearMessage(forgotEmailMessage)
       const email = forgotEmailInput?.value?.trim() || ''
@@ -677,7 +704,11 @@
           return
         }
 
-        if (!codeModalOpened && forgotCodeModal) {
+        if (codeModalOpened) {
+          if (forgotResendButton) {
+            applyCooldownFromPayload(forgotResendButton, payload, response.headers.get('Retry-After'))
+          }
+        } else if (forgotCodeModal) {
           forgotEmail = email
           if (forgotCodeDescription) {
             const template = forgotCodeDescription.dataset.template || forgotCodeDescription.textContent || ''
@@ -691,6 +722,9 @@
             markResendPending(forgotResendButton)
           }
           openModal(forgotCodeModal)
+          if (forgotResendButton) {
+            applyCooldownFromPayload(forgotResendButton, payload, response.headers.get('Retry-After'))
+          }
         }
       } catch (error) {
         if (codeModalOpened) {
@@ -705,6 +739,7 @@
   }
 
   if (forgotCodeModal) {
+    attachAutoClearOnFocus(forgotCodeModal, forgotCodeMessage)
     forgotCodeInput?.addEventListener('input', () => clearMessage(forgotCodeMessage))
 
     forgotCodeModal.querySelector('[data-action="forgot-verify"]')?.addEventListener('click', async () => {
@@ -752,14 +787,16 @@
 
     forgotCodeModal.querySelector('[data-action="forgot-resend"]')?.addEventListener('click', async (event) => {
       const button = event.currentTarget
-      if (button?.dataset?.resendBusy === 'true' || button?.disabled) {
-        return
-      }
       if (!forgotEmail) {
         showMessage(forgotCodeMessage, getMessage('forgotCodeError', 'Session expired. Start over.'))
         return
       }
-      markResendPending(button)
+      if (button?.dataset?.resendBusy === 'true') {
+        return
+      }
+      if (!button?.disabled) {
+        markResendPending(button)
+      }
       clearMessage(forgotCodeMessage)
       try {
         const { response, payload } = await fetchJson('/api/auth/send-code', {
@@ -791,6 +828,7 @@
   }
 
   if (forgotResetModal) {
+    attachAutoClearOnFocus(forgotResetModal, forgotResetMessage)
     forgotResetModal.querySelector('[data-action="forgot-complete"]')?.addEventListener('click', async () => {
       clearMessage(forgotResetMessage)
       const password = forgotPasswordInput?.value || ''

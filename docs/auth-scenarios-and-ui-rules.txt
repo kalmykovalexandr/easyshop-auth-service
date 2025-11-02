@@ -7,6 +7,7 @@ General rules
 - External clients (Postman, mobile, etc.) must receive the same HTTP status codes and payloads as the web UI.
 - Successful POST `/api/auth/register` and POST `/api/auth/send-code` respond with JSON `{ cooldownSeconds, cooldownUntil, otpStatus }`; the UI reads the returned cooldown values to drive the "Send again" timer.
 - Any web form with required e-mail/password/confirm-password fields (sign-in, registration, forgot-password) shows "Fill all fields." when one or more fields are empty. The message disappears when the user focuses the missing input.
+- Visible error banners auto-dismiss ~7 seconds after they appear and also disappear immediately when the user focuses any field or switches between sign-in / registration screens.
 
 Sign in — scenarios
 1) Successful sign-in (enabled user)
