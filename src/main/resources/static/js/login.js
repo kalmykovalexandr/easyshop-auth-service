@@ -1,5 +1,38 @@
 (function () {
-  const root = document.querySelector('[data-auth-root]')
+
+/**
+ * ==============================================
+ * Аутентификация (ВХОД / РЕГИСТРАЦИЯ / СБРОС ПАРОЛЯ)
+ * ==============================================
+ * Этот файл — «всё-в-одном» клиентская логика без фреймворков.
+ * Что здесь есть:
+ *  - Переключение режимов: вход ↔ регистрация (на одной странице)
+ *  - Валидация email/паролей на клиенте перед запросом
+ *  - Модалки: подтверждение кода (OTP), «забыли пароль», успехи
+ *  - Отправка/переотправка кодов с антиспам-таймером (cooldown)
+ *  - Понятные сообщения об ошибках/успехе с автоскрытием
+ *  - Немного i18n (строки берутся из data-атрибутов)
+ *
+ * Как читать:
+ *  1) «DOM & селекторы» — ищем нужные элементы
+ *  2) «Константы/состояние» — базовые настройки и переменные
+ *  3) «Утилиты» — мелкие функции (валидация, форматирование, i18n)
+ *  4) «Сообщения» — как показываются/скрываются ошибки и успехи
+ *  5) «Модалки» — открытие/закрытие, запрет прокрутки, фокус
+ *  6) «API» — безопасный fetch JSON
+ *  7) «Resend/Cooldown» — логика антиспама для повторной отправки кода
+ *  8) «UI-хелперы» — показать/скрыть пароль и прочее
+ *  9) «Sign-in/Sign-up/OTP/Forgot» — основные пользовательские сценарии
+ * 10) «Init» — стартовый режим, обработка ?error=disabled, Esc и т.д.
+ */
+
+// =========================================================
+// DOM & БАЗОВЫЕ СЕЛЕКТОРЫ (ищем всё, что понадобится)
+// ---------------------------------------------------------
+// Важно: мы не используем фреймворки. Всё — «чистый» JS.
+// Если [data-auth-root] не найден — просто выходим.
+// =========================================================
+const root = document.querySelector('[data-auth-root]')
   if (!root) {
     return
   }
@@ -11,7 +44,16 @@
   const registerForm = root.querySelector('[data-register-form]')
   const registerError = root.querySelector('[data-register-error]')
   const signinError = root.querySelector('[data-signin-error]')
-  const titleStore = {
+
+// =========================================================
+// КОНСТАНТЫ, НАСТРОЙКИ И I18N
+// ---------------------------------------------------------
+// - Заголовки для вкладки (document.title) по режимам
+// - Базовый дефолт кулдауна для «переотправить код»
+// - Магазинчик строк i18n (берём из data-i18n-store)
+// - Регэкспы для валидации
+// =========================================================
+const titleStore = {
     signin: card?.dataset?.signinTitle || document.title,
     register: card?.dataset?.registerTitle || document.title
   }
@@ -56,16 +98,27 @@
     forgotResetMessage
   ].filter(Boolean)
 
-  let activeModal = null
+
+// =========================================================
+// ИЗМЕНЯЕМОЕ СОСТОЯНИЕ (state)
+// ---------------------------------------------------------
+// Здесь удобно держать текущую модалку, emailы и токены.
+// Эти переменные «живут» внутри IIFE и не текут наружу.
+// =========================================================
+let activeModal = null
   let registerEmail = ''
   let otpEmail = ''
   let forgotEmail = ''
   let resetToken = ''
   let resendTimer = null
 
+// Возвращает строку по ключу из i18n-store либо запасной текст
+
   function getMessage(key, fallback = '') {
     return messages && typeof messages[key] === 'string' ? messages[key] : fallback
   }
+
+// Подставляет email в шаблон: "{email}" → реальный адрес
 
   function format(template, value) {
     if (typeof template !== 'string') {
@@ -74,17 +127,30 @@
     return template.replace('{email}', value || '')
   }
 
+// Проверка «сильности» пароля по регэкспу (длина + типы символов)
+
   function isPasswordStrong(value) {
     return PASSWORD_REGEX.test(value || '')
   }
+
+// Простая проверка email-формата на клиенте
 
   function isEmailValid(value) {
     return EMAIL_REGEX.test(value || '')
   }
 
   // Remove error query param from URL and hide server-rendered error message
+
+// Удаляет ?error=... из URL и очищает серверную ошибку входа
   function removeErrorParam() {
-    try {
+
+// =========================================================
+// INIT (Продолжение): если ?error=disabled → пользователь не активирован
+// ---------------------------------------------------------
+// - Автооткрываем OTP, «гарантируем» отправку кода
+// - Показываем подсказку с адресом (если есть)
+// =========================================================
+try {
       const url = new URL(window.location.href)
       if (url.searchParams.has('error')) {
         url.searchParams.delete('error')
@@ -95,6 +161,8 @@
       clearMessage(signinError)
     } catch (_) {}
   }
+
+// Открывает модалку: показывает её, ставит фокус, блокирует прокрутку body
 
   function openModal(modal) {
     if (!modal) {
@@ -111,6 +179,8 @@
     }
   }
 
+// Закрывает модалку и снимает блокировку прокрутки
+
   function closeModal(modal) {
     if (!modal) {
       return
@@ -123,6 +193,8 @@
     }
   }
 
+// Закрывает любые открытые модалки (например, при переходе)
+
   function closeAllModals() {
     document.querySelectorAll('.auth-modal').forEach(closeModal)
   }
@@ -133,7 +205,11 @@
 
   registerSuccessModal?.querySelector('[data-action="close-modal"]')?.addEventListener('click', () => {
     removeErrorParam()
-    setMode('signin')
+
+// =========================================================
+// INIT (Старт): устанавливаем режим «вход»
+// =========================================================
+setMode('signin')
   })
 
   forgotSuccessModal?.querySelector('[data-action="close-modal"]')?.addEventListener('click', () => {
@@ -199,7 +275,16 @@
     { capture: true }
   )
 
-  if (signinError && !signinError.hidden && signinError.textContent && signinError.textContent.trim().length > 0) {
+
+// =========================================================
+// SIGN-IN (Вход): первичная инициализация + валидация формы
+// ---------------------------------------------------------
+// - Показываем серверную ошибку, если она уже пришла
+// - Кнопки «переключить на регистрацию/вход»
+// - Открытие окна «Забыли пароль?»
+// - На submit: проверяем, что поля не пустые и email валиден
+// =========================================================
+if (signinError && !signinError.hidden && signinError.textContent && signinError.textContent.trim().length > 0) {
     showMessage(signinError, signinError.textContent.trim(), 'error')
   }
 
@@ -229,6 +314,8 @@
       openModal(forgotEmailModal)
     })
   })
+
+// Переключает видимость пароля в поле: «показать/скрыть»
 
   function togglePasswordVisibility(button) {
     const input = button?.parentElement?.querySelector('input')
@@ -276,16 +363,22 @@
     })
   }
 
-  const passwordToggles = Array.from(root.querySelectorAll('[data-toggle-password]'))
+
+// =========================================================
+// UI: кнопка «показать/скрыть пароль»
+// ---------------------------------------------------------
+// - Кнопка появляется только когда поле в фокусе и не пустое
+// - По клику меняем тип input и обновляем иконку
+// =========================================================
+const passwordToggles = Array.from(root.querySelectorAll('[data-toggle-password]'))
 
   passwordToggles.forEach((button) => {
     const input = button?.parentElement?.querySelector('input')
     if (!input) {
       button.classList.add('auth-field__toggle--hidden')
       return
-    button.classList.add('auth-field__toggle--hidden')
     }
-
+    button.classList.add('auth-field__toggle--hidden')
     const updateToggleVisibility = () => {
       const hasValue = Boolean(input.value && input.value.length > 0)
       const focused = document.activeElement === input
@@ -313,6 +406,8 @@
     error: 7000
   }
 
+// Показывает сообщение (ошибка/успех) с авто-скрытием через N секунд
+
   function showMessage(container, text, type = 'error') {
     if (!container) return
     const existingTimer = messageTimers.get(container)
@@ -336,6 +431,8 @@
     }
   }
 
+// Скрывает сообщение и сбрасывает таймер авто-скрытия
+
   function clearMessage(container) {
     if (!container) return
     const existingTimer = messageTimers.get(container)
@@ -352,6 +449,8 @@
 
   const ERROR_CLEAR_DELAY_MS = 200
 
+// Помогает не «мигать» сообщениями — ждём минимальную задержку
+
   function isReadyToClear(container, now) {
     const lastShownAt = Number(container?.dataset?.lastShownAt || 0)
     if (!lastShownAt) {
@@ -359,6 +458,8 @@
     }
     return now - lastShownAt >= ERROR_CLEAR_DELAY_MS
   }
+
+// Скрывает все видимые сообщения (с учётом «задержки очистки»)
 
   function clearAllMessages(force = false) {
     const now = Date.now()
@@ -373,6 +474,8 @@
     })
   }
 
+// Автоматически очищает сообщение, когда пользователь сфокусировался на форме
+
   function attachAutoClearOnFocus(node, container) {
     if (!node || !container) {
       return
@@ -381,13 +484,21 @@
       if (event.isTrusted === false) {
         return
       }
-      const lastShownAt = Number(container.dataset.lastShownAt || 0)
-      if (lastShownAt && Date.now() - lastShownAt < 200) {
+      if (container.hidden) {
         return
       }
-      clearMessage(container)
+      const lastShownAt = Number(container.dataset.lastShownAt || 0)
+      const elapsed = lastShownAt ? Date.now() - lastShownAt : ERROR_CLEAR_DELAY_MS
+      const delay = Math.max(0, ERROR_CLEAR_DELAY_MS - elapsed)
+      if (delay === 0) {
+        clearMessage(container)
+      } else {
+        window.setTimeout(() => clearMessage(container), delay)
+      }
     })
   }
+
+// Обёртка над fetch: всегда JSON, ловит пустой ответ (204), не кидает исключения при .json()
 
   async function fetchJson(url, options = {}) {
     const response = await fetch(url, {
@@ -401,12 +512,16 @@
     return { response, payload }
   }
 
+// Помечает кнопку «переотправить код» как занятую (disable + визуальный класс)
+
   function markResendPending(button) {
     if (!button) return
     button.dataset.resendBusy = 'true'
     button.disabled = true
     button.classList.add('auth-otp-resend--disabled')
   }
+
+// Сбрасывает состояние кнопки «переотправить код» к исходному виду
 
   function resetResendButton(button) {
     if (!button) return
@@ -416,6 +531,8 @@
     button.textContent = originalLabel
     button.classList.remove('auth-otp-resend--disabled')
   }
+
+// Запускает обратный отсчёт (cooldown) на кнопке «переотправить код»
 
   function startCooldown(button, seconds) {
     if (!button) return
@@ -456,6 +573,8 @@
     }, 1000)
   }
 
+// Пытается вычислить время ожидания из payload (cooldownSeconds / cooldownUntil / retryAfterSeconds)
+
   function extractCooldownSeconds(payload) {
     if (!payload || typeof payload !== 'object') {
       return defaultResendCooldown
@@ -487,6 +606,8 @@
     return Math.max(0, Math.max(...candidates))
   }
 
+// Если в payload нет точного времени, пробуем заголовок Retry-After → иначе 0
+
   function resolveCooldownSeconds(payload, fallbackHeader) {
     const fromPayload = extractCooldownSeconds(payload)
     if (fromPayload > 0) {
@@ -499,11 +620,15 @@
     return 0
   }
 
+// Применяет найденный cooldown к кнопке (запускает таймер)
+
   function applyCooldownFromPayload(button, payload, fallbackHeader) {
     if (!button) return
     const seconds = resolveCooldownSeconds(payload, fallbackHeader)
     startCooldown(button, seconds)
   }
+
+// Красиво форматирует секунды: "1:05 sec" или "12 sec"
 
   function formatCooldown(seconds) {
     const total = Math.max(0, Math.round(seconds))
@@ -515,7 +640,15 @@
     return `${secs} sec`
   }
 
-  if (registerForm) {
+
+// =========================================================
+// SIGN-UP (Регистрация) + запуск OTP
+// ---------------------------------------------------------
+// - Валидация email/пароля/подтверждения
+// - POST /api/auth/register
+// - При успехе: открываем модалку OTP и запускаем кулдаун на «переотправить»
+// =========================================================
+if (registerForm) {
     attachAutoClearOnFocus(registerForm, registerError)
     registerForm.addEventListener('submit', async (event) => {
       event.preventDefault()
@@ -601,7 +734,15 @@
         registerEmail = email
         otpEmail = email
 
-        if (otpModal) {
+
+// =========================================================
+// OTP (подтверждение кода)
+// ---------------------------------------------------------
+// - Проверяем, что код — 8 цифр
+// - POST /api/auth/verify-code с activateUser
+// - «Переотправить код»: POST /api/auth/send-code + антиспам (429) и таймер
+// =========================================================
+if (otpModal) {
           if (otpDescription) {
             const template = otpDescription.dataset.template || otpDescription.textContent || ''
             otpDescription.textContent = format(template, registerEmail)
@@ -709,7 +850,15 @@
     })
   }
 
-  if (forgotEmailModal) {
+
+// =========================================================
+// FORGOT PASSWORD (Шаг 1): отправка кода на e-mail
+// ---------------------------------------------------------
+// - Валидация email + открытие модалки ввода кода
+// - POST /api/auth/send-code
+// - Обработка ошибок и возврат к шагу ввода e-mail при неуспехе
+// =========================================================
+if (forgotEmailModal) {
     attachAutoClearOnFocus(forgotEmailModal, forgotEmailMessage)
     forgotEmailModal.querySelector('[data-action="forgot-send"]')?.addEventListener('click', async () => {
       clearMessage(forgotEmailMessage)
@@ -725,7 +874,15 @@
       forgotEmailInput && (forgotEmailInput.value = email)
 
       let codeModalOpened = false
-      if (forgotCodeModal) {
+
+// =========================================================
+// FORGOT PASSWORD (Шаг 2): проверка кода
+// ---------------------------------------------------------
+// - Проверяем, что код — 8 цифр
+// - POST /api/auth/verify-code → выдаёт resetToken
+// - «Переотправить» с антиспамом и таймером
+// =========================================================
+if (forgotCodeModal) {
         forgotEmail = email
         if (forgotCodeDescription) {
           const template = forgotCodeDescription.dataset.template || forgotCodeDescription.textContent || ''
@@ -891,7 +1048,15 @@
     })
   }
 
-  if (forgotResetModal) {
+
+// =========================================================
+// FORGOT PASSWORD (Шаг 3): установка нового пароля
+// ---------------------------------------------------------
+// - Валидация: поля заполнены, совпадают, пароль «сильный»
+// - POST /api/auth/reset-password (нужен resetToken)
+// - При успехе — модалка «успех»
+// =========================================================
+if (forgotResetModal) {
     attachAutoClearOnFocus(forgotResetModal, forgotResetMessage)
     forgotResetModal.querySelector('[data-action="forgot-complete"]')?.addEventListener('click', async () => {
       clearMessage(forgotResetMessage)
@@ -948,14 +1113,18 @@
     })
   }
 
-  document.addEventListener('keydown', (event) => {
+
+// Esc закрывает активную модалку
+document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape' && activeModal) {
       closeModal(activeModal)
     }
   })
 
   // Clear signin error only when user edits email or password
-  const usernameInput = signinForm?.querySelector('input[name="username"]')
+
+// Очистка ошибки входа при изменении email/пароля (чтобы не мешала вводить)
+const usernameInput = signinForm?.querySelector('input[name="username"]')
   const passwordInput = signinForm?.querySelector('input[name="password"]')
   usernameInput?.addEventListener('input', () => clearMessage(signinError))
   passwordInput?.addEventListener('input', () => clearMessage(signinError))
